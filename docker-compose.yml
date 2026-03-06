@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: risecircle
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  python-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/risecircle
+      JWT_SECRET: rise-circle-secret-key-change-in-production
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+
+  node-server:
+    build:
+      context: ./node-server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      PYTHON_API: http://python-api:8000
+      JWT_SECRET: rise-circle-secret-key-change-in-production
+      PORT: 3000
+    depends_on:
+      - python-api
+
+volumes:
+  postgres_data:

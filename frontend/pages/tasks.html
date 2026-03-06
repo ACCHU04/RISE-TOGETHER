@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Tasks</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1 class="page-title">Task Calendar 📋</h1>
+          <p class="page-subtitle">Plan and track your daily tasks</p>
+        </div>
+        <button class="btn btn-primary" onclick="showAddTask()">+ Add Task</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start">
+
+      <!-- Calendar -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <button class="btn btn-secondary btn-sm" onclick="changeMonth(-1)">← Prev</button>
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px" id="calMonthLabel"></div>
+          <button class="btn btn-secondary btn-sm" onclick="changeMonth(1)">Next →</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid">
+          <div class="cal-day-header">Su</div>
+          <div class="cal-day-header">Mo</div>
+          <div class="cal-day-header">Tu</div>
+          <div class="cal-day-header">We</div>
+          <div class="cal-day-header">Th</div>
+          <div class="cal-day-header">Fr</div>
+          <div class="cal-day-header">Sa</div>
+        </div>
+
+        <!-- Selected date summary -->
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:8px">
+            Selected Date
+          </div>
+          <div style="font-size:16px;font-weight:700" id="selectedDateLabel">Today</div>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap" id="selectedDateStats"></div>
+        </div>
+      </div>
+
+      <!-- Tasks Panel -->
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="card-title" style="margin:0" id="taskListTitle">Tasks</div>
+            <div style="display:flex;gap:8px">
+              <select class="form-select" style="width:auto;padding:6px 12px;font-size:13px" onchange="filterTasks(this.value)">
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+          <div id="tasksList">
+            <div class="empty-state">
+              <div class="empty-state-icon">📋</div>
+              <div class="empty-state-title">Loading tasks...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add Task Modal template (shown via Modal.show) -->
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  let currentYear = new Date().getFullYear();
+  let currentMonth = new Date().getMonth();
+  let selectedDate = dateUtils.today();
+  let allTasks = [];
+  let taskDates = new Set();
+
+  function buildCalendar() {
+    const label = new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    document.getElementById('calMonthLabel').textContent = label;
+
+    const grid = document.getElementById('calendarGrid');
+    // Remove all day cells (keep headers)
+    const headers = grid.querySelectorAll('.cal-day-header');
+    grid.innerHTML = '';
+    headers.forEach(h => grid.appendChild(h));
+
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const daysInPrev = new Date(currentYear, currentMonth, 0).getDate();
+    const today = new Date();
+
+    // Previous month padding
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const d = document.createElement('div');
+      d.className = 'cal-day other-month';
+      d.textContent = daysInPrev - i;
+      grid.appendChild(d);
+    }
+
+    // Current month days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const d = document.createElement('div');
+      d.className = 'cal-day';
+      d.textContent = day;
+
+      const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      d.dataset.date = dateStr;
+
+      if (today.getFullYear() === currentYear && today.getMonth() === currentMonth && today.getDate() === day) {
+        d.classList.add('today');
+      }
+      if (dateStr === selectedDate) d.classList.add('selected');
+      if (taskDates.has(dateStr)) d.classList.add('has-tasks');
+
+      d.addEventListener('click', () => selectDate(dateStr));
+      grid.appendChild(d);
+    }
+
+    // Next month padding
+    const totalCells = grid.querySelectorAll('.cal-day').length + firstDay;
+    const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let i = 1; i <= remaining; i++) {
+      const d = document.createElement('div');
+      d.className = 'cal-day other-month';
+      d.textContent = i;
+      grid.appendChild(d);
+    }
+  }
+
+  function changeMonth(dir) {
+    currentMonth += dir;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    loadTasks();
+  }
+
+  function selectDate(dateStr) {
+    selectedDate = dateStr;
+    document.querySelectorAll('.cal-day').forEach(d => {
+      d.classList.toggle('selected', d.dataset.date === dateStr);
+    });
+    const label = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    document.getElementById('selectedDateLabel').textContent = label;
+    renderTasks();
+  }
+
+  async function loadTasks() {
+    const monthKey = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}`;
+    try {
+      allTasks = await api('GET', `/tasks?month=${monthKey}`);
+      taskDates = new Set(allTasks.map(t => t.date));
+      buildCalendar();
+      renderTasks();
+    } catch (err) {
+      Toast.error('Failed to load tasks');
+    }
+  }
+
+  let currentFilter = 'all';
+
+  function filterTasks(val) {
+    currentFilter = val;
+    renderTasks();
+  }
+
+  function renderTasks() {
+    const dayTasks = allTasks.filter(t => t.date === selectedDate);
+    const filtered = currentFilter === 'all' ? dayTasks : dayTasks.filter(t => t.status === currentFilter);
+
+    const label = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    document.getElementById('taskListTitle').textContent = `Tasks for ${label}`;
+
+    const done = dayTasks.filter(t => t.status === 'completed').length;
+    document.getElementById('selectedDateStats').innerHTML = `
+      <span class="tag tag-green">${done} completed</span>
+      <span class="tag tag-amber">${dayTasks.length - done} pending</span>
+    `;
+
+    const list = document.getElementById('tasksList');
+    if (filtered.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-title">No ${currentFilter !== 'all' ? currentFilter : ''} tasks</div>
+          <div class="empty-state-desc">Click "+ Add Task" to create one</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(task => `
+      <div class="task-item" id="task-${task.id}">
+        <div class="task-checkbox ${task.status === 'completed' ? 'checked' : ''}"
+             onclick="completeTask('${task.id}', '${task.status}', this)">
+          ${task.status === 'completed' ? '✓' : ''}
+        </div>
+        <div style="flex:1">
+          <div class="task-text ${task.status === 'completed' ? 'completed' : ''}">${task.title}</div>
+          ${task.description ? `<div style="font-size:12px;color:var(--text-muted);margin-top:2px">${task.description}</div>` : ''}
+          ${task.progress > 0 ? `
+            <div style="margin-top:8px">
+              <div class="progress-bar"><div class="progress-fill green" style="width:${task.progress}%"></div></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${task.progress}%</div>
+            </div>` : ''}
+        </div>
+        <div class="task-actions">
+          <button class="btn btn-secondary btn-sm btn-icon" onclick="editTask('${task.id}')" title="Edit">✏️</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTask('${task.id}')" title="Delete">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function completeTask(id, status, el) {
+    if (status === 'completed') return;
+    try {
+      await api('PATCH', `/tasks/${id}`, { status: 'completed', progress: 100 });
+      const taskEl = document.getElementById(`task-${id}`);
+      taskEl.querySelector('.task-checkbox').classList.add('checked');
+      taskEl.querySelector('.task-checkbox').innerHTML = '✓';
+      taskEl.querySelector('.task-text').classList.add('completed');
+      const taskIdx = allTasks.findIndex(t => t.id === id);
+      if (taskIdx >= 0) allTasks[taskIdx].status = 'completed';
+      Toast.success('Task completed! 🎯');
+    } catch (err) {
+      Toast.error('Failed to update task');
+    }
+  }
+
+  async function deleteTask(id) {
+    if (!confirm('Delete this task?')) return;
+    try {
+      await api('DELETE', `/tasks/${id}`);
+      allTasks = allTasks.filter(t => t.id !== id);
+      taskDates = new Set(allTasks.map(t => t.date));
+      buildCalendar();
+      renderTasks();
+      Toast.success('Task deleted');
+    } catch (err) {
+      Toast.error('Failed to delete task');
+    }
+  }
+
+  function editTask(id) {
+    const task = allTasks.find(t => t.id === id);
+    if (!task) return;
+    Modal.show(`
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" id="editTitle" value="${task.title}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="form-textarea" id="editDesc">${task.description || ''}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Progress (%)</label>
+        <input type="range" min="0" max="100" value="${task.progress || 0}" class="form-input" id="editProgress"
+               oninput="document.getElementById('editProgressVal').textContent = this.value + '%'">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="editProgressVal">${task.progress || 0}%</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="saveEdit('${id}')">Save Changes</button>
+        <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+      </div>
+    `, '✏️ Edit Task');
+  }
+
+  async function saveEdit(id) {
+    const title = document.getElementById('editTitle').value.trim();
+    const description = document.getElementById('editDesc').value.trim();
+    const progress = parseInt(document.getElementById('editProgress').value);
+    if (!title) { Toast.error('Title required'); return; }
+    try {
+      const updated = await api('PATCH', `/tasks/${id}`, { title, description, progress });
+      const idx = allTasks.findIndex(t => t.id === id);
+      if (idx >= 0) allTasks[idx] = { ...allTasks[idx], ...updated };
+      renderTasks();
+      Modal.close();
+      Toast.success('Task updated!');
+    } catch (err) {
+      Toast.error('Failed to update task');
+    }
+  }
+
+  function showAddTask() {
+    Modal.show(`
+      <div class="form-group">
+        <label class="form-label">Task Title</label>
+        <input class="form-input" id="newTitle" placeholder="e.g. Study Physics Chapter 3">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description (optional)</label>
+        <textarea class="form-textarea" id="newDesc" placeholder="Add details..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="newDate" value="${selectedDate}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Task Type</label>
+        <select class="form-select" id="newIsStudy">
+          <option value="false">Regular Task</option>
+          <option value="true">Study Task</option>
+        </select>
+      </div>
+      <div id="studyInstructions" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Study Instructions</label>
+          <textarea class="form-textarea" id="newInstructions" placeholder="Study goals, topics, resources..."></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="addTask()">Add Task</button>
+        <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+      </div>
+    `, '📋 Add New Task');
+
+    document.getElementById('newIsStudy').addEventListener('change', function() {
+      document.getElementById('studyInstructions').style.display = this.value === 'true' ? 'block' : 'none';
+    });
+  }
+
+  async function addTask() {
+    const title = document.getElementById('newTitle').value.trim();
+    const description = document.getElementById('newDesc').value.trim();
+    const date = document.getElementById('newDate').value;
+    const isStudy = document.getElementById('newIsStudy').value === 'true';
+    const instructions = isStudy ? document.getElementById('newInstructions')?.value.trim() : '';
+
+    if (!title) { Toast.error('Title is required'); return; }
+    if (!date) { Toast.error('Date is required'); return; }
+
+    try {
+      const task = await api('POST', '/tasks', { title, description, date, is_study: isStudy, instructions });
+      allTasks.push(task);
+      taskDates.add(task.date);
+      if (task.date === selectedDate) {
+        buildCalendar();
+        renderTasks();
+      } else {
+        selectDate(task.date);
+      }
+      Modal.close();
+      Toast.success('Task added! 📋');
+    } catch (err) {
+      Toast.error('Failed to add task: ' + err.message);
+    }
+  }
+
+  // Initialize
+  loadTasks();
+  selectDate(selectedDate);
+</script>
+</body>
+</html>

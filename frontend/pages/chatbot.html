@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — AI Coach</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .ai-chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 220px);min-height:400px}
+    .ai-messages{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;background:var(--surface2);border-radius:var(--radius) var(--radius) 0 0;border:1px solid var(--border);border-bottom:none}
+    .ai-msg{display:flex;gap:12px;animation:fadeInUp 0.3s ease}
+    .ai-msg.user{flex-direction:row-reverse}
+    .ai-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;font-weight:700}
+    .ai-avatar.bot{background:linear-gradient(135deg,#f59e0b,#f97316);color:#000}
+    .ai-avatar.user{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff}
+    .ai-bubble{max-width:75%;padding:14px 18px;border-radius:16px;font-size:14px;line-height:1.6}
+    .ai-bubble.bot{background:var(--surface3);border-radius:0 16px 16px 16px}
+    .ai-bubble.user{background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.2);border-radius:16px 0 16px 16px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--text-muted);display:inline-block;animation:bounce 1.2s infinite}
+    .dot:nth-child(2){animation-delay:0.2s}.dot:nth-child(3){animation-delay:0.4s}
+    @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-8px)}}
+    .ai-input-area{display:flex;gap:10px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius)}
+    .quick-btn{padding:8px 14px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;transition:all 0.2s;white-space:nowrap}
+    .quick-btn:hover{background:var(--surface3);color:var(--text);border-color:var(--accent)}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1 class="page-title">AI Study Coach 🤖</h1><p class="page-subtitle">Your personal accountability coach, study planner and productivity advisor</p></div>
+        <button class="btn btn-secondary" onclick="clearChat()">🗑 Clear</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start">
+      <div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="quick-btn" onclick="sendQuick('Create a 30-day study plan for me')">📅 Study Plan</button>
+          <button class="quick-btn" onclick="sendQuick('Give me productivity tips for today')">⚡ Productivity Tips</button>
+          <button class="quick-btn" onclick="sendQuick('I need motivation to wake up early')">🌅 Motivation</button>
+          <button class="quick-btn" onclick="sendQuick('Help me beat procrastination right now')">🧠 Anti-Procrastination</button>
+          <button class="quick-btn" onclick="sendQuick('What should I focus on to improve my productivity score?')">📊 Improve Score</button>
+        </div>
+        <div class="ai-chat-wrap">
+          <div class="ai-messages" id="aiMessages">
+            <div class="ai-msg">
+              <div class="ai-avatar bot">⚡</div>
+              <div class="ai-bubble bot">
+                <strong>Hey! I am your Rise Circle AI Coach</strong><br><br>
+                I can help you with:<br>
+                <strong>Study planning</strong> — personalized schedules<br>
+                <strong>Productivity tips</strong> — science-backed strategies<br>
+                <strong>Accountability coaching</strong> — stay on track<br>
+                <strong>Study questions</strong> — any subject<br><br>
+                What do you need help with today?
+              </div>
+            </div>
+          </div>
+          <div class="ai-input-area">
+            <input class="chat-input" id="aiInput" placeholder="Ask me anything about studying, productivity, habits..."
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}">
+            <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">Send</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card">
+          <div class="card-title">Capabilities</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">📅</span><div><div style="font-weight:600;font-size:13px">Study Planner</div><div style="color:var(--text-muted);font-size:12px">Custom daily schedules</div></div></div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">🎯</span><div><div style="font-weight:600;font-size:13px">Accountability Coach</div><div style="color:var(--text-muted);font-size:12px">Stay disciplined</div></div></div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">⚡</span><div><div style="font-weight:600;font-size:13px">Productivity Tips</div><div style="color:var(--text-muted);font-size:12px">Science-backed methods</div></div></div>
+            <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">📚</span><div><div style="font-weight:600;font-size:13px">Study Help</div><div style="color:var(--text-muted);font-size:12px">Any subject, any level</div></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Try Asking</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="sampleQuestions"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Session Stats</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;color:var(--text-muted)">Messages</span><span style="font-weight:700;color:var(--accent)" id="msgCount">0</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Started</span><span style="font-size:12px;color:var(--text-muted)" id="sessionTime"></span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+initSidebar();
+
+const user = Auth.getUser();
+document.getElementById('sessionTime').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+
+// Sample questions
+const samples = ["How do I study math effectively?","Create a morning routine for me","Help me prepare for exams in 2 weeks","How to improve focus?","Explain spaced repetition","What are the best study habits?"];
+document.getElementById('sampleQuestions').innerHTML = samples.map(q=>`
+  <div onclick="sendQuick('${q}')" style="font-size:12px;color:var(--text-dim);padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">"${q}"</div>`).join('');
+
+let chatHistory = [];
+let msgCount = 0;
+
+const SYSTEM = `You are an expert AI Study Coach and Productivity Advisor for Rise Circle, a discipline platform. The user's name is ${user?.username||'Student'}.
+
+Your roles:
+1. STUDY PLANNER: Create detailed day-by-day study schedules with specific times and topics
+2. ACCOUNTABILITY COACH: Be firm but encouraging, push for consistency  
+3. PRODUCTIVITY TIPS: Share Pomodoro, spaced repetition, active recall, 2-minute rule etc
+4. STUDY HELP: Answer academic questions clearly
+
+Keep responses concise but actionable. Use bold for key points. Always end with a next action step.`;
+
+function scrollBottom(){const el=document.getElementById('aiMessages');el.scrollTop=el.scrollHeight}
+
+function addMsg(role,html){
+  const el=document.getElementById('aiMessages');
+  const isUser=role==='user';
+  const d=document.createElement('div');
+  d.className=`ai-msg${isUser?' user':''}`;
+  d.innerHTML=`<div class="ai-avatar ${isUser?'user':'bot'}">${isUser?(user?.username?.[0]?.toUpperCase()||'U'):'⚡'}</div><div class="ai-bubble ${isUser?'user':'bot'}">${html}</div>`;
+  el.appendChild(d);
+  scrollBottom();
+  if(isUser){msgCount++;document.getElementById('msgCount').textContent=msgCount}
+}
+
+function fmt(t){return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>')}
+
+function showTyping(){
+  const el=document.getElementById('aiMessages');
+  const d=document.createElement('div');
+  d.className='ai-msg';d.id='typing';
+  d.innerHTML=`<div class="ai-avatar bot">⚡</div><div class="ai-bubble bot" style="display:flex;align-items:center;gap:6px;padding:16px 20px"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+  el.appendChild(d);scrollBottom();
+}
+
+async function sendMessage(){
+  const input=document.getElementById('aiInput');
+  const text=input.value.trim();
+  if(!text)return;
+  input.value='';
+  addMsg('user',text);
+  chatHistory.push({role:'user',content:text});
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true;btn.textContent='...';
+  showTyping();
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:SYSTEM,messages:chatHistory.slice(-10)})
+    });
+    const data=await res.json();
+    document.getElementById('typing')?.remove();
+    if(data.content?.[0]?.text){
+      const reply=data.content[0].text;
+      chatHistory.push({role:'assistant',content:reply});
+      addMsg('assistant',fmt(reply));
+    } else {
+      addMsg('assistant',getLocalResponse(text));
+    }
+  }catch(e){
+    document.getElementById('typing')?.remove();
+    addMsg('assistant',getLocalResponse(text));
+  }
+  btn.disabled=false;btn.textContent='Send';
+}
+
+function getLocalResponse(text){
+  const t=text.toLowerCase();
+  if(t.includes('study plan')||t.includes('schedule')){
+    return '<strong>📅 30-Day Study Plan</strong><br><br><strong>Week 1 — Foundation</strong><br>• Days 1-2: Review basics, make notes<br>• Days 3-4: Practice problems<br>• Day 5: Self-quiz<br>• Days 6-7: Review weak areas<br><br><strong>Week 2 — Deep Practice</strong><br>• Focus on harder concepts<br>• Pomodoro sessions: 25min work, 5min break<br><br><strong>Week 3 — Application</strong><br>• Apply to real problems, mock tests<br><br><strong>Week 4 — Mastery</strong><br>• Full reviews, confidence building<br><br>Add your tasks in the Task Calendar to stay on track!';
+  }
+  if(t.includes('motivat')||t.includes('wake up')){
+    return '<strong>🔥 You\'ve got this!</strong><br><br>Remember: <strong>Discipline beats motivation every time.</strong><br><br>• Your future self is counting on your present self<br>• Every day you wake up early is a win against your old habits<br>• Small consistent actions create massive results<br><br><strong>Action right now:</strong> Write down your #1 goal and put it where you can see it every morning.';
+  }
+  if(t.includes('procrastin')){
+    return '<strong>🧠 Beat Procrastination Now</strong><br><br>• <strong>2-Minute Rule:</strong> If it takes less than 2 min, do it NOW<br>• <strong>5-Minute Start:</strong> Just start for 5 minutes — momentum builds<br>• <strong>Remove distractions:</strong> Phone face down, other room<br>• <strong>Pomodoro:</strong> 25min focused work, 5min break<br>• <strong>Eat the frog:</strong> Do the hardest task first<br><br><strong>Start your smallest task in the next 60 seconds!</strong>';
+  }
+  if(t.includes('productiv')||t.includes('focus')){
+    return '<strong>⚡ Top Productivity Techniques</strong><br><br>• <strong>Pomodoro:</strong> 25min work + 5min break cycles<br>• <strong>Time blocking:</strong> Schedule specific tasks to specific hours<br>• <strong>Single-tasking:</strong> One task at a time, no multitasking<br>• <strong>Review daily:</strong> Check what you accomplished each night<br>• <strong>Sleep 7-8hrs:</strong> Sleep is a productivity superpower<br><br><strong>Try the Focus Timer in Rise Circle today!</strong>';
+  }
+  return '<strong>⚡ AI Coach</strong><br><br>I\'m here to help with study planning, productivity, and accountability!<br><br>Try asking:<br>• "Create a study plan for [subject] in [X days]"<br>• "Give me tips to improve focus"<br>• "Help me build a morning routine"<br><br><em>For full AI responses, the Anthropic API connection is needed.</em>';
+}
+
+function sendQuick(text){document.getElementById('aiInput').value=text;sendMessage()}
+
+function clearChat(){
+  chatHistory=[];msgCount=0;
+  document.getElementById('msgCount').textContent='0';
+  document.getElementById('aiMessages').innerHTML=`<div class="ai-msg"><div class="ai-avatar bot">⚡</div><div class="ai-bubble bot">Chat cleared! What can I help you with? 😊</div></div>`;
+}
+</script>
+</body>
+</html>

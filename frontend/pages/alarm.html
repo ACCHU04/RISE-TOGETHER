@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Wake Alarm</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .wake-btn {
+      padding: 20px 40px;
+      font-size: 18px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      border-radius: 16px;
+      cursor: pointer;
+      border: none;
+      width: 100%;
+      max-width: 340px;
+      transition: all 0.2s;
+    }
+    .wake-btn.ready {
+      background: linear-gradient(135deg, #f59e0b, #f97316);
+      color: #000;
+      box-shadow: 0 8px 32px rgba(245,158,11,0.3);
+    }
+    .wake-btn.ready:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(245,158,11,0.4); }
+    .wake-btn.done { background: rgba(16,185,129,0.2); color: var(--accent3); border: 1px solid rgba(16,185,129,0.3); cursor: default; }
+    .time-big { font-family: 'Syne', sans-serif; font-size: 80px; font-weight: 800; letter-spacing: -4px; line-height: 1; }
+    .alarm-time-input { font-family: 'Syne', sans-serif; font-size: 40px; font-weight: 700; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; color: var(--text); text-align: center; outline: none; width: 200px; transition: border-color 0.2s; }
+    .alarm-time-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245,158,11,0.1); }
+    .history-bar-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .history-bar { flex: 1; height: 8px; background: var(--surface3); border-radius: 999px; overflow: hidden; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">Wake Alarm 🌙</h1>
+      <p class="page-subtitle">Set your alarm and confirm when you wake up</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+      <!-- Main Alarm Panel -->
+      <div>
+        <!-- Current Time -->
+        <div class="card" style="text-align:center;padding:40px;margin-bottom:16px">
+          <div style="font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px">Current Time</div>
+          <div class="time-big" id="currentClock">00:00</div>
+          <div style="font-size:14px;color:var(--text-muted);margin-top:8px" id="currentDate"></div>
+        </div>
+
+        <!-- Alarm Setting -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">Set Alarm Time</div>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <input type="time" class="alarm-time-input" id="alarmTimeInput" value="06:00">
+            <div style="display:flex;gap:10px">
+              <button class="btn btn-primary" onclick="saveAlarm()">💾 Save Alarm</button>
+              <button class="btn btn-secondary" onclick="testAlarm()">🔔 Test</button>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="setQuickAlarm('05:00')">5:00 AM</button>
+            <button class="btn btn-secondary btn-sm" onclick="setQuickAlarm('05:30')">5:30 AM</button>
+            <button class="btn btn-secondary btn-sm" onclick="setQuickAlarm('06:00')">6:00 AM</button>
+            <button class="btn btn-secondary btn-sm" onclick="setQuickAlarm('06:30')">6:30 AM</button>
+            <button class="btn btn-secondary btn-sm" onclick="setQuickAlarm('07:00')">7:00 AM</button>
+          </div>
+        </div>
+
+        <!-- Wake Confirmation -->
+        <div class="card" style="text-align:center;padding:32px">
+          <div id="alarmStatusDisplay" style="margin-bottom:24px">
+            <div style="font-size:48px;margin-bottom:12px">⏰</div>
+            <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:700;margin-bottom:8px" id="alarmSetFor">No alarm set</div>
+            <div id="alarmStatusTag"></div>
+          </div>
+
+          <button class="wake-btn ready" id="wakeBtn" onclick="confirmWake()">
+            ☀️ I Am Awake!
+          </button>
+
+          <div id="wakeConfirmedInfo" style="margin-top:20px;display:none">
+            <div style="font-size:13px;color:var(--text-muted)">You woke up at</div>
+            <div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:700;color:var(--accent3);margin:4px 0" id="wakeTimeDisplay">—</div>
+            <div id="wakeStatusBadge"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Stats -->
+        <div class="card">
+          <div class="card-title">Wake Stats</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:14px;color:var(--text-dim)">On-Time Rate</span>
+              <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent)" id="onTimeRate">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:14px;color:var(--text-dim)">Current Streak</span>
+              <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent3)" id="wakeStreak">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:14px;color:var(--text-dim)">Avg Wake Time</span>
+              <span style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--accent2)" id="avgWakeTime">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Wake History -->
+        <div class="card">
+          <div class="card-title">Recent Wake History</div>
+          <div id="wakeHistory">
+            <div class="empty-state" style="padding:20px">
+              <div class="empty-state-icon" style="font-size:28px">📅</div>
+              <div class="empty-state-title" style="font-size:13px">No history yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="card">
+          <div class="card-title">Wake Tips 💡</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:13px;color:var(--text-dim);padding-left:4px">
+              🌊 Place alarm across the room to force yourself up
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);padding-left:4px">
+              💡 Turn on lights immediately — darkness signals sleep
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);padding-left:4px">
+              💧 Drink water within 5 minutes of waking
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);padding-left:4px">
+              🚶 Do 10 jumping jacks to wake your body
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);padding-left:4px">
+              🔁 Consistent sleep time matters most
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  // Live clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('currentClock').textContent =
+      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    document.getElementById('currentDate').textContent =
+      now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  let alarmData = null;
+  let hasConfirmedWake = false;
+
+  async function loadAlarmData() {
+    try {
+      const data = await api('GET', '/alarm');
+      alarmData = data.alarm;
+
+      if (alarmData) {
+        document.getElementById('alarmTimeInput').value = alarmData.alarm_time.substring(0, 5);
+        const [h, m] = alarmData.alarm_time.split(':');
+        const hNum = parseInt(h);
+        const ampm = hNum >= 12 ? 'PM' : 'AM';
+        const h12 = hNum > 12 ? hNum - 12 : hNum === 0 ? 12 : hNum;
+        document.getElementById('alarmSetFor').textContent = `${h12}:${m} ${ampm}`;
+      }
+
+      if (data.today_wake) {
+        const wake = data.today_wake;
+        hasConfirmedWake = true;
+        document.getElementById('wakeBtn').className = 'wake-btn done';
+        document.getElementById('wakeBtn').innerHTML = '✅ Already Confirmed';
+        document.getElementById('wakeConfirmedInfo').style.display = 'block';
+        document.getElementById('wakeTimeDisplay').textContent = dateUtils.formatTime(wake.wake_time);
+        const statusClass = wake.status === 'on_time' ? 'awake' : wake.status === 'late' ? 'pending' : 'missed';
+        const statusText = wake.status === 'on_time' ? '✓ On Time — Great job!' : wake.status === 'late' ? 'A bit late — still counts!' : 'Missed — try tomorrow';
+        document.getElementById('wakeStatusBadge').innerHTML = `<span class="wake-status ${statusClass}" style="margin-top:8px;display:inline-flex">${statusText}</span>`;
+      }
+    } catch (err) {
+      Toast.error('Failed to load alarm data');
+    }
+  }
+
+  async function saveAlarm() {
+    const time = document.getElementById('alarmTimeInput').value;
+    if (!time) { Toast.error('Please select a time'); return; }
+    try {
+      await api('POST', '/alarm', { alarm_time: time });
+      Toast.success('Alarm saved! ⏰');
+      loadAlarmData();
+    } catch (err) {
+      Toast.error('Failed to save alarm');
+    }
+  }
+
+  function setQuickAlarm(time) {
+    document.getElementById('alarmTimeInput').value = time;
+  }
+
+  function testAlarm() {
+    playAlarmSound();
+    Toast.info('🔔 Test alarm sound!');
+  }
+
+  function playAlarmSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = i % 2 === 0 ? 880 : 1100;
+        osc.type = 'square';
+        gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.3 + 0.25);
+        osc.start(ctx.currentTime + i * 0.3);
+        osc.stop(ctx.currentTime + i * 0.3 + 0.25);
+      }
+    } catch (e) {}
+  }
+
+  async function confirmWake() {
+    if (hasConfirmedWake) { Toast.info('Already confirmed for today!'); return; }
+    document.getElementById('wakeBtn').innerHTML = 'Confirming...';
+    document.getElementById('wakeBtn').disabled = true;
+    try {
+      const data = await api('POST', '/alarm/wake', {});
+      hasConfirmedWake = true;
+      document.getElementById('wakeBtn').className = 'wake-btn done';
+      document.getElementById('wakeBtn').innerHTML = '✅ Wake Confirmed!';
+      document.getElementById('wakeBtn').disabled = false;
+      document.getElementById('wakeConfirmedInfo').style.display = 'block';
+      document.getElementById('wakeTimeDisplay').textContent = dateUtils.formatTime(data.wake_time);
+
+      const statusClass = data.status === 'on_time' ? 'awake' : data.status === 'late' ? 'pending' : 'missed';
+      const statusText = data.status === 'on_time' ? '✓ On Time — Great job!' : 'A bit late — still counts!';
+      document.getElementById('wakeStatusBadge').innerHTML = `<span class="wake-status ${statusClass}" style="margin-top:8px;display:inline-flex">${statusText}</span>`;
+
+      Toast.success(data.status === 'on_time' ? '☀️ On time! Amazing discipline!' : '⏰ Wake confirmed!');
+
+      // Broadcast to community
+      if (window._socket) {
+        window._socket.emit('wake_confirmed', { time: dateUtils.formatTime(data.wake_time) });
+      }
+
+      loadWakeHistory();
+    } catch (err) {
+      Toast.error('Failed to confirm wake: ' + err.message);
+      document.getElementById('wakeBtn').innerHTML = '☀️ I Am Awake!';
+      document.getElementById('wakeBtn').disabled = false;
+    }
+  }
+
+  async function loadWakeHistory() {
+    try {
+      const data = await api('GET', '/analytics');
+      const wakeStats = data.wake_stats;
+
+      if (wakeStats.length > 0) {
+        const onTime = wakeStats.filter(w => w.status === 'on_time').length;
+        const rate = Math.round((onTime / wakeStats.length) * 100);
+        document.getElementById('onTimeRate').textContent = rate + '%';
+
+        // Streak
+        let streak = 0;
+        const today = new Date();
+        const wakeMap = {};
+        wakeStats.forEach(w => { wakeMap[w.date] = w; });
+        let check = new Date();
+        while (true) {
+          const key = check.toISOString().split('T')[0];
+          if (wakeMap[key] && wakeMap[key].status === 'on_time') { streak++; }
+          else break;
+          check.setDate(check.getDate() - 1);
+        }
+        document.getElementById('wakeStreak').textContent = `🔥 ${streak} days`;
+
+        // Avg time
+        const times = wakeStats.filter(w => w.wake_time).map(w => new Date(w.wake_time));
+        if (times.length > 0) {
+          const avgMs = times.reduce((a, b) => a + (b.getHours() * 60 + b.getMinutes()), 0) / times.length;
+          const avgH = Math.floor(avgMs / 60);
+          const avgM = Math.round(avgMs % 60);
+          const ap = avgH >= 12 ? 'PM' : 'AM';
+          const h12 = avgH > 12 ? avgH - 12 : avgH;
+          document.getElementById('avgWakeTime').textContent = `${h12}:${String(avgM).padStart(2,'0')} ${ap}`;
+        }
+
+        // History list
+        const recent = wakeStats.slice(-7).reverse();
+        document.getElementById('wakeHistory').innerHTML = recent.map(w => {
+          const d = new Date(w.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          const statusColor = w.status === 'on_time' ? 'var(--accent3)' : w.status === 'late' ? 'var(--accent)' : 'var(--danger)';
+          const icon = w.status === 'on_time' ? '✅' : w.status === 'late' ? '⚠️' : '❌';
+          const wakeT = w.wake_time ? dateUtils.formatTime(w.wake_time) : '—';
+          return `
+            <div class="history-bar-wrap">
+              <span style="font-size:16px">${icon}</span>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                  <span style="font-size:13px;font-weight:500">${d}</span>
+                  <span style="font-size:12px;color:${statusColor};font-weight:600">${wakeT}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch (e) {}
+  }
+
+  loadAlarmData();
+  loadWakeHistory();
+</script>
+</body>
+</html>

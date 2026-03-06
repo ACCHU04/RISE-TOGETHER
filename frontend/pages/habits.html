@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Habits</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1 class="page-title">Habit Tracker 🔥</h1>
+          <p class="page-subtitle">Build long-term discipline through consistent habits</p>
+        </div>
+        <button class="btn btn-primary" onclick="showAddHabit()">+ Add Habit</button>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid-4 section">
+      <div class="stat-card">
+        <div class="stat-value stat-accent" id="totalHabits">0</div>
+        <div class="stat-label">Active Habits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-green" id="doneToday">0</div>
+        <div class="stat-label">Done Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-blue" id="longestStreak">0</div>
+        <div class="stat-label">Longest Streak 🔥</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-purple" id="completionRate">0%</div>
+        <div class="stat-label">Today's Rate</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start">
+
+      <!-- Habits List -->
+      <div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div class="card-title" style="margin:0">Today's Habits</div>
+            <div id="todayProgress" style="font-size:13px;color:var(--text-muted)">Loading...</div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div style="margin-bottom:20px">
+            <div class="progress-bar" style="height:10px">
+              <div class="progress-fill green" id="overallProgress" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div id="habitsList">
+            <div class="empty-state">
+              <div class="empty-state-icon">🔥</div>
+              <div class="empty-state-title">No habits yet</div>
+              <div class="empty-state-desc">Add your first habit to start building discipline</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Streak Leaders -->
+        <div class="card">
+          <div class="card-title">Streak Board</div>
+          <div id="streakBoard">
+            <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Habit Ideas -->
+        <div class="card">
+          <div class="card-title">Habit Ideas 💡</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${[
+              ['🌅', 'Wake before 6 AM'],
+              ['📖', 'Read 20 pages'],
+              ['💪', 'Exercise 30 min'],
+              ['🧘', 'Meditate 10 min'],
+              ['💧', 'Drink 8 glasses of water'],
+              ['📝', 'Journal daily'],
+              ['🚶', 'Walk 10,000 steps'],
+              ['📵', 'No phone first hour'],
+            ].map(([icon, name]) => `
+              <div onclick="quickAddHabit('${name}')"
+                style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.15s"
+                onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+                <span style="font-size:16px">${icon}</span>
+                <span style="font-size:13px;color:var(--text-dim)">${name}</span>
+                <span style="margin-left:auto;font-size:11px;color:var(--accent)">+ Add</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  // Inline the habit ideas HTML since we can't use template literals in static HTML
+  document.querySelector('.card:last-child div:last-child').innerHTML = [
+    ['🌅', 'Wake before 6 AM'],
+    ['📖', 'Read 20 pages'],
+    ['💪', 'Exercise 30 min'],
+    ['🧘', 'Meditate 10 min'],
+    ['💧', 'Drink 8 glasses of water'],
+    ['📝', 'Journal daily'],
+    ['🚶', 'Walk 10,000 steps'],
+    ['📵', 'No phone first hour'],
+  ].map(([icon, name]) => `
+    <div onclick="quickAddHabit('${name}')"
+      style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.15s"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <span style="font-size:16px">${icon}</span>
+      <span style="font-size:13px;color:var(--text-dim)">${name}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--accent)">+ Add</span>
+    </div>
+  `).join('');
+</script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  let habits = [];
+
+  async function loadHabits() {
+    try {
+      habits = await api('GET', '/habits');
+      renderHabits();
+      updateStats();
+    } catch (err) {
+      Toast.error('Failed to load habits');
+    }
+  }
+
+  function updateStats() {
+    document.getElementById('totalHabits').textContent = habits.length;
+    const done = habits.filter(h => h.done_today).length;
+    document.getElementById('doneToday').textContent = done;
+    const longest = habits.reduce((max, h) => Math.max(max, h.streak || 0), 0);
+    document.getElementById('longestStreak').textContent = `${longest} 🔥`;
+    const rate = habits.length > 0 ? Math.round((done / habits.length) * 100) : 0;
+    document.getElementById('completionRate').textContent = rate + '%';
+    document.getElementById('todayProgress').textContent = `${done}/${habits.length} completed`;
+    document.getElementById('overallProgress').style.width = rate + '%';
+
+    // Streak board
+    const sorted = [...habits].sort((a, b) => (b.streak || 0) - (a.streak || 0)).slice(0, 5);
+    document.getElementById('streakBoard').innerHTML = sorted.length === 0
+      ? '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">No habits yet</div>'
+      : sorted.map((h, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-weight:700;color:var(--text-muted);width:20px;text-align:center">${i+1}</span>
+          <span style="flex:1;font-size:13px;font-weight:500">${h.name}</span>
+          <span style="color:var(--accent);font-weight:700;font-size:13px">🔥 ${h.streak}</span>
+        </div>
+      `).join('');
+  }
+
+  function renderHabits() {
+    const list = document.getElementById('habitsList');
+    if (habits.length === 0) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🔥</div>
+          <div class="empty-state-title">No habits yet</div>
+          <div class="empty-state-desc">Click "+ Add Habit" or pick from ideas →</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = habits.map(h => `
+      <div class="habit-item" id="habit-${h.id}" style="${h.done_today ? 'border-color:rgba(16,185,129,0.2);background:rgba(16,185,129,0.03)' : ''}">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">${h.done_today ? '✅' : '⬜'}</span>
+            <span class="habit-name" style="${h.done_today ? 'text-decoration:line-through;color:var(--text-muted)' : ''}">${h.name}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding-left:24px">
+            <span class="habit-streak">🔥 ${h.streak || 0} day streak</span>
+            <span class="tag ${h.done_today ? 'tag-green' : 'tag-amber'}" style="font-size:10px">
+              ${h.done_today ? 'Done today' : h.target_frequency}
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${!h.done_today ? `
+            <button class="btn btn-green btn-sm" onclick="completeHabit('${h.id}')">
+              ✓ Mark Done
+            </button>
+          ` : ''}
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteHabit('${h.id}')" title="Delete">🗑</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function completeHabit(id) {
+    try {
+      const data = await api('POST', `/habits/${id}/complete`);
+      const idx = habits.findIndex(h => h.id === id);
+      if (idx >= 0) { habits[idx].done_today = true; habits[idx].streak = data.streak; }
+      renderHabits();
+      updateStats();
+      Toast.success(`🔥 Streak: ${data.streak} days! Keep it up!`);
+    } catch (err) {
+      Toast.error('Failed to complete habit');
+    }
+  }
+
+  async function deleteHabit(id) {
+    if (!confirm('Delete this habit? This will reset your streak.')) return;
+    try {
+      await api('DELETE', `/habits/${id}`);
+      habits = habits.filter(h => h.id !== id);
+      renderHabits();
+      updateStats();
+      Toast.success('Habit deleted');
+    } catch (err) {
+      Toast.error('Failed to delete habit');
+    }
+  }
+
+  function showAddHabit() {
+    Modal.show(`
+      <div class="form-group">
+        <label class="form-label">Habit Name</label>
+        <input class="form-input" id="habitName" placeholder="e.g. Read 20 pages">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency</label>
+        <select class="form-select" id="habitFreq">
+          <option value="daily">Daily</option>
+          <option value="weekdays">Weekdays only</option>
+          <option value="weekends">Weekends only</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="addHabit()">Add Habit</button>
+        <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+      </div>
+    `, '🔥 New Habit');
+  }
+
+  async function addHabit() {
+    const name = document.getElementById('habitName').value.trim();
+    const freq = document.getElementById('habitFreq').value;
+    if (!name) { Toast.error('Habit name is required'); return; }
+    try {
+      const habit = await api('POST', '/habits', { name, target_frequency: freq });
+      habits.push({ ...habit, done_today: false });
+      renderHabits();
+      updateStats();
+      Modal.close();
+      Toast.success('Habit added! 🔥');
+    } catch (err) {
+      Toast.error('Failed to add habit');
+    }
+  }
+
+  function quickAddHabit(name) {
+    Modal.show(`
+      <div class="form-group">
+        <label class="form-label">Habit Name</label>
+        <input class="form-input" id="habitName" value="${name}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency</label>
+        <select class="form-select" id="habitFreq">
+          <option value="daily">Daily</option>
+          <option value="weekdays">Weekdays only</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="addHabit()">Add Habit</button>
+        <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+      </div>
+    `, '🔥 Add Habit');
+  }
+
+  loadHabits();
+</script>
+</body>
+</html>

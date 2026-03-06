@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Groups</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .group-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all 0.2s;margin-bottom:10px; }
+    .group-card:hover { border-color:rgba(245,158,11,0.3);transform:translateY(-2px); }
+    .group-card.active { border-color:var(--accent);background:rgba(245,158,11,0.05); }
+    .member-row { display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px;transition:all 0.2s; }
+    .member-row:hover { background:var(--surface3); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1 class="page-title">Friend Groups 👥</h1><p class="page-subtitle">Accountability circles with productivity tracking</p></div>
+        <button class="btn btn-primary" onclick="showCreateGroup()">+ Create Group</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
+      <div>
+        <div class="card">
+          <div class="card-title">Your Groups</div>
+          <div id="groupsList"><div class="empty-state" style="padding:20px"><div class="empty-state-icon" style="font-size:28px">👥</div><div class="empty-state-title" style="font-size:13px">Loading...</div></div></div>
+        </div>
+      </div>
+      <div id="groupDetail">
+        <div class="card" style="text-align:center;padding:48px">
+          <div style="font-size:48px;margin-bottom:16px">👥</div>
+          <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px">Select a Group</div>
+          <div style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Choose a group to see member productivity scores</div>
+          <button class="btn btn-primary" onclick="showCreateGroup()">Create Your First Group</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+initSidebar();
+
+let groups = [], activeGroupId = null;
+
+async function loadGroups() {
+  try {
+    groups = await api('GET', '/groups');
+    renderGroupsList();
+    if (groups.length > 0) selectGroup(groups[0].id);
+  } catch(e) { renderGroupsList(); }
+}
+
+function renderGroupsList() {
+  const el = document.getElementById('groupsList');
+  if (!groups.length) { el.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-state-icon" style="font-size:28px">👥</div><div class="empty-state-title" style="font-size:13px">No groups yet</div><div class="empty-state-desc">Create one!</div></div>`; return; }
+  el.innerHTML = groups.map(g => `
+    <div class="group-card ${g.id===activeGroupId?'active':''}" id="gc-${g.id}" onclick="selectGroup('${g.id}')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(245,158,11,0.15);display:flex;align-items:center;justify-content:center;font-size:18px">${g.role==='owner'?'👑':'👥'}</div>
+        <div><div style="font-weight:700;font-size:14px">${g.name}</div><div style="font-size:12px;color:var(--text-muted)">${g.member_count} members</div></div>
+      </div>
+      ${g.description?`<div style="font-size:12px;color:var(--text-muted)">${g.description}</div>`:''}
+    </div>`).join('');
+}
+
+async function selectGroup(groupId) {
+  activeGroupId = groupId;
+  renderGroupsList();
+  const group = groups.find(g => g.id === groupId);
+  document.getElementById('groupDetail').innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div><h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800">${group.name}</h2><p style="color:var(--text-muted);font-size:13px">${group.description||'No description'}</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="showInvite('${groupId}')">+ Invite Friend</button>
+          ${group.role!=='owner'?`<button class="btn btn-danger btn-sm" onclick="leaveGroup('${groupId}')">Leave</button>`:''}
+        </div>
+      </div>
+      <div id="membersList"><div style="text-align:center;padding:20px;color:var(--text-muted)">Loading members...</div></div>
+    </div>`;
+  try {
+    const members = await api('GET', `/groups/${groupId}/members`);
+    const el = document.getElementById('membersList');
+    if (!members.length) { el.innerHTML = `<div class="empty-state"><div class="empty-state-title">No members yet — invite friends!</div></div>`; return; }
+    const maxScore = Math.max(...members.map(m => m.productivity_score||0), 1);
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+        <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:12px"><div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--accent)">${members.length}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Members</div></div>
+        <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:12px"><div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--accent3)">${Math.round(members.reduce((s,m)=>s+(m.productivity_score||0),0)/members.length)}%</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Avg Score</div></div>
+        <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:12px"><div style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--accent2)">🔥${Math.max(...members.map(m=>m.streak_count||0))}</div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">Top Streak</div></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:12px">Productivity Leaderboard</div>
+      ${members.map((m,i) => {
+        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
+        const score = Math.round(m.productivity_score||0);
+        const pct = Math.round((score/maxScore)*100);
+        const colors=['#f59e0b','#3b82f6','#10b981','#8b5cf6','#ef4444'];
+        const color = colors[m.username.charCodeAt(0)%colors.length];
+        return `<div class="member-row">
+          <span style="font-size:20px;width:32px;text-align:center">${medal}</span>
+          <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:700;color:#000;font-size:14px;flex-shrink:0">${m.username[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+              <span style="font-size:14px;font-weight:600">${m.username}${m.role==='owner'?' 👑':''}</span>
+              <span style="font-size:13px;font-weight:700;color:var(--accent)">${score}%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <div style="display:flex;gap:12px;margin-top:6px">
+              <span style="font-size:11px;color:var(--text-muted)">🔥 ${m.streak_count||0} streak</span>
+              <span style="font-size:11px;color:var(--text-muted)">✅ ${m.total_tasks_completed||0} tasks</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}`;
+  } catch(e) { Toast.error('Failed to load members'); }
+}
+
+function showCreateGroup() {
+  Modal.show(`
+    <div class="form-group"><label class="form-label">Group Name</label><input class="form-input" id="groupName" placeholder="e.g. Morning Risers"></div>
+    <div class="form-group"><label class="form-label">Description (optional)</label><textarea class="form-textarea" id="groupDesc" placeholder="What is this group about?"></textarea></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="createGroup()">Create Group</button>
+      <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+    </div>`, '👥 Create Group');
+}
+
+async function createGroup() {
+  const name = document.getElementById('groupName').value.trim();
+  const description = document.getElementById('groupDesc').value.trim();
+  if (!name) { Toast.error('Group name required'); return; }
+  try {
+    const g = await api('POST', '/groups', { name, description });
+    groups.unshift({...g, role:'owner', member_count:1});
+    renderGroupsList(); selectGroup(g.id); Modal.close();
+    Toast.success('Group created! 👥');
+  } catch(e) { Toast.error('Failed to create group'); }
+}
+
+function showInvite(groupId) {
+  Modal.show(`
+    <div class="form-group"><label class="form-label">Friend's Username</label><input class="form-input" id="inviteUsername" placeholder="Enter exact username"></div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">The user must have a Rise Circle account.</p>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-primary" style="flex:1" onclick="inviteFriend('${groupId}')">Send Invite</button>
+      <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+    </div>`, '✉️ Invite Friend');
+}
+
+async function inviteFriend(groupId) {
+  const username = document.getElementById('inviteUsername').value.trim();
+  if (!username) { Toast.error('Username required'); return; }
+  try {
+    await api('POST', `/groups/${groupId}/invite`, { username });
+    Modal.close(); Toast.success(`${username} added! 🎉`);
+    selectGroup(groupId);
+    const g = groups.find(g => g.id === groupId);
+    if (g) { g.member_count++; renderGroupsList(); }
+  } catch(e) { Toast.error(e.message || 'Failed to invite user'); }
+}
+
+async function leaveGroup(groupId) {
+  if (!confirm('Leave this group?')) return;
+  try {
+    await api('DELETE', `/groups/${groupId}/leave`);
+    groups = groups.filter(g => g.id !== groupId);
+    renderGroupsList();
+    document.getElementById('groupDetail').innerHTML = `<div class="card" style="text-align:center;padding:48px"><div style="font-size:48px">👋</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-top:12px">You left the group</div></div>`;
+    Toast.success('Left group');
+  } catch(e) { Toast.error('Failed to leave group'); }
+}
+
+loadGroups();
+</script>
+</body>
+</html>

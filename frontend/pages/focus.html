@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Focus Timer</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .mode-btn { flex: 1; text-align: center; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--text-muted); transition: all 0.2s; }
+    .mode-btn.active { background: var(--surface3); color: var(--text); }
+    .session-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface3); }
+    .session-dot.done { background: var(--accent); }
+    .ring-track { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 12; }
+    .ring-progress { fill: none; stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+    .timer-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">Focus Timer ⏱</h1>
+      <p class="page-subtitle">Deep work sessions with Pomodoro technique</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+
+      <!-- Timer -->
+      <div class="card" style="text-align:center;padding:40px">
+        <!-- Mode Selector -->
+        <div style="display:flex;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:32px;max-width:360px;margin-left:auto;margin-right:auto">
+          <div class="mode-btn active" onclick="setMode('focus',25)" id="modeFocus">🧠 Focus 25m</div>
+          <div class="mode-btn" onclick="setMode('short',5)" id="modeShort">☕ Short 5m</div>
+          <div class="mode-btn" onclick="setMode('long',15)" id="modeLong">🌿 Long 15m</div>
+        </div>
+
+        <!-- SVG Ring Timer -->
+        <div style="position:relative;width:260px;height:260px;margin:0 auto 28px">
+          <svg width="260" height="260" style="transform:rotate(-90deg)">
+            <circle class="ring-track" cx="130" cy="130" r="110"/>
+            <circle class="ring-progress" cx="130" cy="130" r="110"
+              id="timerRing"
+              stroke="url(#timerGrad)"
+              stroke-dasharray="691"
+              stroke-dashoffset="0"/>
+            <defs>
+              <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#f59e0b"/>
+                <stop offset="100%" style="stop-color:#f97316"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="timer-center">
+            <div class="timer-display" id="timerDisplay">25:00</div>
+            <div class="timer-label" id="timerLabel">Ready to focus</div>
+          </div>
+        </div>
+
+        <!-- Session dots -->
+        <div style="display:flex;justify-content:center;gap:8px;margin-bottom:28px" id="sessionDots">
+          <div class="session-dot"></div>
+          <div class="session-dot"></div>
+          <div class="session-dot"></div>
+          <div class="session-dot"></div>
+        </div>
+
+        <!-- Controls -->
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary btn-lg" onclick="toggleTimer()" id="timerBtn">
+            ▶ Start Session
+          </button>
+          <button class="btn btn-secondary btn-lg" onclick="resetTimer()">↺ Reset</button>
+          <button class="btn btn-secondary btn-lg" onclick="skipTimer()">⏭ Skip</button>
+        </div>
+
+        <!-- Task selector -->
+        <div style="margin-top:24px;max-width:360px;margin-left:auto;margin-right:auto">
+          <label class="form-label">Focus on task (optional)</label>
+          <select class="form-select" id="taskSelect">
+            <option value="">— Select a task —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Today's Stats -->
+        <div class="card">
+          <div class="card-title">Today's Focus</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:12px">
+              <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--accent)" id="totalMinutesToday">0</div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px">Minutes</div>
+            </div>
+            <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:12px">
+              <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--accent2)" id="sessionsToday">0</div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-top:4px">Sessions</div>
+            </div>
+          </div>
+          <div style="background:var(--surface2);border-radius:12px;padding:12px">
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px">
+              <span style="color:var(--text-muted)">Daily Goal (2h)</span>
+              <span id="focusGoalPct" style="color:var(--accent);font-weight:600">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="focusGoalBar" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="card">
+          <div class="card-title">Focus Tips</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px;font-size:13px">
+              <span style="font-size:20px">📵</span>
+              <span style="color:var(--text-dim)">Put your phone face down during sessions</span>
+            </div>
+            <div style="display:flex;gap:10px;font-size:13px">
+              <span style="font-size:20px">🎧</span>
+              <span style="color:var(--text-dim)">Use instrumental music or white noise</span>
+            </div>
+            <div style="display:flex;gap:10px;font-size:13px">
+              <span style="font-size:20px">💧</span>
+              <span style="color:var(--text-dim)">Stay hydrated — drink water every break</span>
+            </div>
+            <div style="display:flex;gap:10px;font-size:13px">
+              <span style="font-size:20px">✍️</span>
+              <span style="color:var(--text-dim)">Write your goal before each session</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Session History -->
+        <div class="card">
+          <div class="card-title">Session History</div>
+          <div id="sessionHistory">
+            <div class="empty-state" style="padding:20px">
+              <div class="empty-state-icon" style="font-size:28px">⏱</div>
+              <div class="empty-state-title" style="font-size:13px">No sessions today</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  // Timer State
+  let timerInterval = null;
+  let isRunning = false;
+  let currentMode = 'focus';
+  let totalSeconds = 25 * 60;
+  let remainingSeconds = totalSeconds;
+  let currentSessionId = null;
+  let completedSessions = 0;
+  const CIRCUMFERENCE = 2 * Math.PI * 110;
+
+  const ring = document.getElementById('timerRing');
+  ring.style.strokeDasharray = CIRCUMFERENCE;
+
+  function updateRing(ratio) {
+    const offset = CIRCUMFERENCE * (1 - ratio);
+    ring.style.strokeDashoffset = offset;
+  }
+
+  function formatTime(secs) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function setMode(mode, minutes) {
+    if (isRunning) return;
+    currentMode = mode;
+    totalSeconds = minutes * 60;
+    remainingSeconds = totalSeconds;
+    document.getElementById('timerDisplay').textContent = formatTime(remainingSeconds);
+    document.getElementById('timerLabel').textContent = mode === 'focus' ? 'Ready to focus' : mode === 'short' ? 'Short break' : 'Long break';
+    updateRing(1);
+
+    // Update mode buttons
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
+
+    // Update colors for break modes
+    ring.style.stroke = mode === 'focus' ? 'url(#timerGrad)' : mode === 'short' ? '#10b981' : '#3b82f6';
+  }
+
+  async function toggleTimer() {
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  }
+
+  async function startTimer() {
+    isRunning = true;
+    document.getElementById('timerBtn').innerHTML = '⏸ Pause';
+    document.getElementById('timerLabel').textContent = currentMode === 'focus' ? 'Focus time...' : 'Break time...';
+
+    if (currentMode === 'focus' && !currentSessionId) {
+      try {
+        const taskId = document.getElementById('taskSelect').value || null;
+        const session = await api('POST', '/focus/start', { task_id: taskId, duration: Math.round(totalSeconds / 60) });
+        currentSessionId = session.id;
+      } catch (e) { /* offline mode */ }
+    }
+
+    timerInterval = setInterval(() => {
+      remainingSeconds--;
+      document.getElementById('timerDisplay').textContent = formatTime(remainingSeconds);
+      updateRing(remainingSeconds / totalSeconds);
+
+      if (remainingSeconds <= 0) {
+        clearInterval(timerInterval);
+        onTimerComplete();
+      }
+    }, 1000);
+  }
+
+  function pauseTimer() {
+    isRunning = false;
+    clearInterval(timerInterval);
+    document.getElementById('timerBtn').innerHTML = '▶ Resume';
+    document.getElementById('timerLabel').textContent = 'Paused';
+  }
+
+  async function onTimerComplete() {
+    isRunning = false;
+    document.getElementById('timerBtn').innerHTML = '▶ Start Session';
+
+    if (currentMode === 'focus') {
+      completedSessions++;
+      updateSessionDots();
+      if (currentSessionId) {
+        try {
+          await api('POST', '/focus/end', { session_id: currentSessionId, completed: true });
+          currentSessionId = null;
+        } catch (e) {}
+      }
+      Toast.success('Focus session complete! 🎯 Take a break.');
+      loadFocusStats();
+
+      // Auto-suggest break
+      if (completedSessions < 4) {
+        setTimeout(() => setMode('short', 5), 500);
+      } else {
+        setTimeout(() => { setMode('long', 15); completedSessions = 0; updateSessionDots(); }, 500);
+      }
+    } else {
+      Toast.info('Break over! Time to focus again 💪');
+      setTimeout(() => setMode('focus', 25), 500);
+    }
+
+    // Play sound if possible
+    playBeep();
+  }
+
+  function playBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.8);
+    } catch (e) {}
+  }
+
+  function resetTimer() {
+    isRunning = false;
+    clearInterval(timerInterval);
+    remainingSeconds = totalSeconds;
+    document.getElementById('timerDisplay').textContent = formatTime(remainingSeconds);
+    document.getElementById('timerBtn').innerHTML = '▶ Start Session';
+    document.getElementById('timerLabel').textContent = 'Ready to focus';
+    updateRing(1);
+    currentSessionId = null;
+  }
+
+  function skipTimer() {
+    if (!confirm('Skip this session?')) return;
+    clearInterval(timerInterval);
+    isRunning = false;
+    currentSessionId = null;
+    if (currentMode === 'focus') {
+      setMode('short', 5);
+    } else {
+      setMode('focus', 25);
+    }
+  }
+
+  function updateSessionDots() {
+    const dots = document.querySelectorAll('.session-dot');
+    dots.forEach((d, i) => d.classList.toggle('done', i < completedSessions % 4));
+  }
+
+  async function loadFocusStats() {
+    try {
+      const data = await api('GET', '/focus/today');
+      document.getElementById('totalMinutesToday').textContent = data.total_minutes || 0;
+      document.getElementById('sessionsToday').textContent = data.sessions.length;
+      const pct = Math.min(Math.round((data.total_minutes / 120) * 100), 100);
+      document.getElementById('focusGoalPct').textContent = pct + '%';
+      document.getElementById('focusGoalBar').style.width = pct + '%';
+
+      if (data.sessions.length > 0) {
+        document.getElementById('sessionHistory').innerHTML = data.sessions.map(s => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">${s.completed ? '✅' : '⏸'}</span>
+              <span style="font-size:13px">${s.duration}min session</span>
+            </div>
+            <span style="font-size:12px;color:var(--text-muted)">${dateUtils.formatTime(s.start_time)}</span>
+          </div>
+        `).join('');
+      }
+    } catch (e) {}
+  }
+
+  async function loadTasks() {
+    try {
+      const tasks = await api('GET', `/tasks?month=${dateUtils.monthKey()}`);
+      const today = dateUtils.today();
+      const todayTasks = tasks.filter(t => t.date === today && t.status !== 'completed');
+      const sel = document.getElementById('taskSelect');
+      sel.innerHTML = '<option value="">— Select a task —</option>';
+      todayTasks.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.title;
+        sel.appendChild(opt);
+      });
+    } catch (e) {}
+  }
+
+  loadFocusStats();
+  loadTasks();
+</script>
+</body>
+</html>

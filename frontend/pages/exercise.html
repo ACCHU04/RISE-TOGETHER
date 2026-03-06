@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Exercise</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .exercise-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
+    .exercise-card:hover{border-color:rgba(16,185,129,0.3);transform:translateY(-2px)}
+    .exercise-card.selected{border-color:var(--accent3);background:rgba(16,185,129,0.05)}
+    .exercise-emoji{font-size:40px;margin-bottom:12px;display:block}
+    .timer-big{font-family:'Syne',sans-serif;font-size:64px;font-weight:800;letter-spacing:-3px;line-height:1;text-align:center}
+    .set-tracker{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .set-dot{width:32px;height:32px;border-radius:8px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s}
+    .set-dot.done{background:var(--accent3);border-color:var(--accent3);color:#fff}
+    .set-dot:hover{border-color:var(--accent3)}
+    .workout-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><h1 class="page-title">Exercise Platform 💪</h1><p class="page-subtitle">Workout plans, timer, calorie tracking and progress</p></div>
+        <button class="btn btn-primary" onclick="showLogWorkout()">+ Log Workout</button>
+      </div>
+    </div>
+
+    <!-- Today Stats -->
+    <div class="grid-4 section">
+      <div class="stat-card"><div class="stat-value stat-green" id="todayCalories">0</div><div class="stat-label">Calories Burned</div></div>
+      <div class="stat-card"><div class="stat-value stat-blue" id="todayMinutes">0</div><div class="stat-label">Active Minutes</div></div>
+      <div class="stat-card"><div class="stat-value stat-accent" id="todayExercises">0</div><div class="stat-label">Exercises Done</div></div>
+      <div class="stat-card"><div class="stat-value stat-purple" id="totalCalories">0</div><div class="stat-label">Total Calories Ever</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+      <!-- Exercise Timer -->
+      <div class="card">
+        <div class="card-title">Exercise Timer</div>
+        <div style="text-align:center;padding:12px 0">
+          <div class="timer-big" id="exTimerDisplay" style="color:var(--accent3)">00:00</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:8px" id="exTimerLabel">Ready</div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;margin:16px 0">
+          <button class="btn btn-green" onclick="toggleExTimer()" id="exTimerBtn">▶ Start</button>
+          <button class="btn btn-secondary" onclick="resetExTimer()">↺ Reset</button>
+        </div>
+        <!-- Set/Rep tracker -->
+        <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px">Set Tracker</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Sets</div>
+              <input type="number" class="form-input" id="totalSets" value="3" min="1" max="20" style="width:70px" onchange="buildSetDots()">
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Reps</div>
+              <input type="number" class="form-input" id="totalReps" value="10" min="1" max="100" style="width:70px">
+            </div>
+          </div>
+          <div class="set-tracker" id="setDots"></div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:8px">Tap a circle to mark set complete</div>
+        </div>
+      </div>
+
+      <!-- Workout Plans -->
+      <div class="card">
+        <div class="card-title">Workout Plans</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="showPlan('beginner')">🌱 Beginner</button>
+          <button class="btn btn-secondary btn-sm" onclick="showPlan('intermediate')">⚡ Intermediate</button>
+          <button class="btn btn-secondary btn-sm" onclick="showPlan('advanced')">🔥 Advanced</button>
+          <button class="btn btn-secondary btn-sm" onclick="showPlan('hiit')">💨 HIIT</button>
+        </div>
+        <div id="planDisplay">
+          <div class="empty-state" style="padding:20px">
+            <div class="empty-state-icon" style="font-size:28px">💪</div>
+            <div class="empty-state-title" style="font-size:13px">Select a plan above</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exercise Library -->
+    <div class="card" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin:0">Exercise Library</div>
+        <select class="form-select" style="width:auto;padding:6px 12px;font-size:13px" onchange="filterExercises(this.value)">
+          <option value="all">All</option>
+          <option value="chest">Chest</option>
+          <option value="back">Back</option>
+          <option value="legs">Legs</option>
+          <option value="arms">Arms</option>
+          <option value="cardio">Cardio</option>
+          <option value="core">Core</option>
+        </select>
+      </div>
+      <div id="exerciseLibrary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px"></div>
+    </div>
+
+    <!-- Recent Logs -->
+    <div class="card">
+      <div class="card-title">Recent Workouts</div>
+      <div id="recentLogs">
+        <div class="empty-state" style="padding:20px"><div class="empty-state-icon" style="font-size:28px">📋</div><div class="empty-state-title" style="font-size:13px">No workouts logged yet</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+if (!Auth.requireAuth()) throw new Error();
+document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+initSidebar();
+
+// ── Exercise Data ──────────────────────────────────────────────────────────────
+const EXERCISES = [
+  {name:'Push-ups',emoji:'🤸',muscle:'chest',cal:8,gif:'https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif'},
+  {name:'Pull-ups',emoji:'💪',muscle:'back',cal:10},
+  {name:'Squats',emoji:'🦵',muscle:'legs',cal:9},
+  {name:'Lunges',emoji:'🚶',muscle:'legs',cal:7},
+  {name:'Plank',emoji:'🏋️',muscle:'core',cal:5},
+  {name:'Burpees',emoji:'⚡',muscle:'cardio',cal:12},
+  {name:'Jumping Jacks',emoji:'🎉',muscle:'cardio',cal:8},
+  {name:'Bicep Curls',emoji:'💪',muscle:'arms',cal:4},
+  {name:'Tricep Dips',emoji:'🤲',muscle:'arms',cal:5},
+  {name:'Deadlift',emoji:'🏋️',muscle:'back',cal:11},
+  {name:'Bench Press',emoji:'💪',muscle:'chest',cal:8},
+  {name:'Mountain Climbers',emoji:'⛰️',muscle:'cardio',cal:10},
+  {name:'Crunches',emoji:'🧘',muscle:'core',cal:4},
+  {name:'Leg Press',emoji:'🦵',muscle:'legs',cal:8},
+  {name:'Running',emoji:'🏃',muscle:'cardio',cal:15},
+  {name:'Jump Rope',emoji:'🪢',muscle:'cardio',cal:13},
+];
+
+const PLANS = {
+  beginner: {name:'🌱 Beginner Full Body',days:[
+    {day:'Monday',exercises:['Push-ups','Squats','Plank'],sets:3,reps:10},
+    {day:'Wednesday',exercises:['Lunges','Crunches','Jumping Jacks'],sets:3,reps:12},
+    {day:'Friday',exercises:['Push-ups','Squats','Mountain Climbers'],sets:3,reps:10},
+  ]},
+  intermediate: {name:'⚡ Intermediate Split',days:[
+    {day:'Monday - Chest',exercises:['Push-ups','Bench Press','Tricep Dips'],sets:4,reps:12},
+    {day:'Tuesday - Back',exercises:['Pull-ups','Deadlift'],sets:4,reps:10},
+    {day:'Thursday - Legs',exercises:['Squats','Lunges','Leg Press'],sets:4,reps:12},
+    {day:'Saturday - Cardio',exercises:['Burpees','Jump Rope','Running'],sets:3,reps:15},
+  ]},
+  advanced: {name:'🔥 Advanced 5-Day Split',days:[
+    {day:'Monday - Chest',exercises:['Bench Press','Push-ups','Tricep Dips'],sets:5,reps:12},
+    {day:'Tuesday - Back',exercises:['Pull-ups','Deadlift'],sets:5,reps:10},
+    {day:'Wednesday - Legs',exercises:['Squats','Lunges','Leg Press'],sets:5,reps:12},
+    {day:'Thursday - Arms',exercises:['Bicep Curls','Tricep Dips'],sets:4,reps:15},
+    {day:'Friday - Cardio',exercises:['Burpees','Running','Jump Rope'],sets:4,reps:20},
+  ]},
+  hiit: {name:'💨 HIIT Blast',days:[
+    {day:'Round 1',exercises:['Burpees','Jumping Jacks','Mountain Climbers'],sets:4,reps:20},
+    {day:'Round 2',exercises:['Jump Rope','Squats','Push-ups'],sets:4,reps:20},
+    {day:'Round 3',exercises:['Running','Lunges','Crunches'],sets:3,reps:25},
+  ]},
+};
+
+// ── Timer ──────────────────────────────────────────────────────────────────────
+let exTimerInterval = null, exTimerRunning = false, exTimerSeconds = 0;
+
+function updateTimerDisplay() {
+  const m = Math.floor(exTimerSeconds/60), s = exTimerSeconds%60;
+  document.getElementById('exTimerDisplay').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function toggleExTimer() {
+  if (exTimerRunning) {
+    clearInterval(exTimerInterval); exTimerRunning = false;
+    document.getElementById('exTimerBtn').innerHTML = '▶ Resume';
+    document.getElementById('exTimerLabel').textContent = 'Paused';
+  } else {
+    exTimerRunning = true;
+    document.getElementById('exTimerBtn').innerHTML = '⏸ Pause';
+    document.getElementById('exTimerLabel').textContent = 'Active!';
+    exTimerInterval = setInterval(() => { exTimerSeconds++; updateTimerDisplay(); }, 1000);
+  }
+}
+
+function resetExTimer() {
+  clearInterval(exTimerInterval); exTimerRunning = false; exTimerSeconds = 0;
+  updateTimerDisplay();
+  document.getElementById('exTimerBtn').innerHTML = '▶ Start';
+  document.getElementById('exTimerLabel').textContent = 'Ready';
+}
+
+// ── Set Dots ───────────────────────────────────────────────────────────────────
+function buildSetDots() {
+  const total = parseInt(document.getElementById('totalSets').value) || 3;
+  const container = document.getElementById('setDots');
+  container.innerHTML = '';
+  for (let i = 1; i <= total; i++) {
+    const d = document.createElement('div');
+    d.className = 'set-dot'; d.textContent = i;
+    d.onclick = () => { d.classList.toggle('done'); checkAllSets(); };
+    container.appendChild(d);
+  }
+}
+
+function checkAllSets() {
+  const dots = document.querySelectorAll('.set-dot');
+  const done = document.querySelectorAll('.set-dot.done').length;
+  if (done === dots.length && dots.length > 0) Toast.success('All sets complete! 💪');
+}
+
+buildSetDots();
+
+// ── Exercise Library ──────────────────────────────────────────────────────────
+function renderLibrary(filter='all') {
+  const list = filter === 'all' ? EXERCISES : EXERCISES.filter(e => e.muscle === filter);
+  document.getElementById('exerciseLibrary').innerHTML = list.map(e => `
+    <div class="exercise-card" onclick="quickLogExercise('${e.name}',${e.cal})">
+      <span class="exercise-emoji">${e.emoji}</span>
+      <div style="font-weight:700;font-size:14px;margin-bottom:4px">${e.name}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="tag tag-green" style="font-size:10px">${e.muscle}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${e.cal} cal/min</span>
+      </div>
+      <div style="font-size:11px;color:var(--accent);margin-top:8px">+ Quick Log</div>
+    </div>`).join('');
+}
+
+function filterExercises(val) { renderLibrary(val); }
+
+function quickLogExercise(name, calPerMin) {
+  Modal.show(`
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:600;color:var(--accent)">${name}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Sets</label><input type="number" class="form-input" id="qSets" value="3" min="1"></div>
+      <div class="form-group"><label class="form-label">Reps</label><input type="number" class="form-input" id="qReps" value="10" min="1"></div>
+      <div class="form-group"><label class="form-label">Duration (min)</label><input type="number" class="form-input" id="qDuration" value="5" min="1"></div>
+      <div class="form-group"><label class="form-label">Calories</label><input type="number" class="form-input" id="qCals" value="${calPerMin*5}" min="0"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes (optional)</label><input class="form-input" id="qNotes" placeholder="How did it feel?"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-green" style="flex:1" onclick="submitLog('${name}')">Log Workout</button>
+      <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+    </div>`, `💪 Log ${name}`);
+}
+
+async function submitLog(name) {
+  const sets=parseInt(document.getElementById('qSets').value)||0;
+  const reps=parseInt(document.getElementById('qReps').value)||0;
+  const duration=parseInt(document.getElementById('qDuration').value)||0;
+  const calories=parseInt(document.getElementById('qCals').value)||0;
+  const notes=document.getElementById('qNotes').value;
+  try {
+    await api('POST','/exercise/log',{exercise_name:name,sets,reps,duration_minutes:duration,calories_burned:calories,notes});
+    Modal.close(); Toast.success(`${name} logged! 💪 ${calories} cal burned`);
+    loadStats();
+  } catch(e) { Toast.error('Failed to log workout'); }
+}
+
+function showLogWorkout() {
+  Modal.show(`
+    <div class="form-group"><label class="form-label">Exercise Name</label><input class="form-input" id="wName" placeholder="e.g. Push-ups"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Sets</label><input type="number" class="form-input" id="wSets" value="3"></div>
+      <div class="form-group"><label class="form-label">Reps</label><input type="number" class="form-input" id="wReps" value="10"></div>
+      <div class="form-group"><label class="form-label">Duration (min)</label><input type="number" class="form-input" id="wDuration" value="10"></div>
+      <div class="form-group"><label class="form-label">Calories</label><input type="number" class="form-input" id="wCals" value="50"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn btn-green" style="flex:1" onclick="submitCustomLog()">Log Workout</button>
+      <button class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+    </div>`, '💪 Log Custom Workout');
+}
+
+async function submitCustomLog() {
+  const name=document.getElementById('wName').value.trim();
+  if(!name){Toast.error('Exercise name required');return}
+  const sets=parseInt(document.getElementById('wSets').value)||0;
+  const reps=parseInt(document.getElementById('wReps').value)||0;
+  const duration=parseInt(document.getElementById('wDuration').value)||0;
+  const calories=parseInt(document.getElementById('wCals').value)||0;
+  try {
+    await api('POST','/exercise/log',{exercise_name:name,sets,reps,duration_minutes:duration,calories_burned:calories,notes:''});
+    Modal.close(); Toast.success(`${name} logged! 💪`); loadStats();
+  } catch(e) { Toast.error('Failed to log workout'); }
+}
+
+function showPlan(type) {
+  const plan = PLANS[type];
+  document.getElementById('planDisplay').innerHTML = `
+    <div style="font-weight:700;font-size:15px;margin-bottom:14px">${plan.name}</div>
+    ${plan.days.map(d=>`
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--accent);margin-bottom:8px">${d.day}</div>
+        ${d.exercises.map(ex=>{
+          const e = EXERCISES.find(e=>e.name===ex)||{emoji:'💪',cal:5};
+          return `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:4px;cursor:pointer" onclick="quickLogExercise('${ex}',${e.cal})">
+            <span>${e.emoji}</span>
+            <span style="flex:1;font-size:13px">${ex}</span>
+            <span style="font-size:11px;color:var(--text-muted)">${d.sets}x${d.reps}</span>
+            <span style="font-size:10px;color:var(--accent)">Log</span>
+          </div>`;
+        }).join('')}
+      </div>`).join('')}`;
+}
+
+async function loadStats() {
+  try {
+    const data = await api('GET','/exercise/workouts');
+    document.getElementById('todayCalories').textContent = data.today.calories||0;
+    document.getElementById('todayMinutes').textContent = data.today.minutes||0;
+    document.getElementById('todayExercises').textContent = data.today.exercises||0;
+
+    const statsData = await api('GET','/exercise/stats');
+    document.getElementById('totalCalories').textContent = statsData.total.total_calories||0;
+
+    // Recent logs
+    const logs = document.getElementById('recentLogs');
+    if (!data.logs.length) {
+      logs.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-state-icon" style="font-size:28px">📋</div><div class="empty-state-title" style="font-size:13px">No workouts yet — start moving!</div></div>`;
+      return;
+    }
+    logs.innerHTML = data.logs.slice(0,10).map(l=>`
+      <div class="workout-row">
+        <span style="font-size:24px">${EXERCISES.find(e=>e.name===l.exercise_name)?.emoji||'💪'}</span>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${l.exercise_name}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${l.sets>0?`${l.sets} sets × ${l.reps} reps`:''} ${l.duration_minutes>0?`· ${l.duration_minutes}min`:''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px;font-weight:700;color:var(--accent3)">${l.calories_burned} cal</div>
+          <div style="font-size:11px;color:var(--text-muted)">${new Date(l.logged_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+renderLibrary();
+loadStats();
+</script>
+</body>
+</html>

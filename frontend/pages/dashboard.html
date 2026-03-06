@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Dashboard</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h1 class="page-title" id="greetingText">Good morning ⚡</h1>
+          <p class="page-subtitle" id="dateDisplay"></p>
+        </div>
+        <div id="productivityRing"></div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid-4 section" id="statsGrid">
+      <div class="stat-card">
+        <div class="card-glow" style="background:radial-gradient(circle,rgba(245,158,11,0.15),transparent)"></div>
+        <div class="stat-value stat-accent" id="streakStat">—</div>
+        <div class="stat-label">Day Streak 🔥</div>
+      </div>
+      <div class="stat-card">
+        <div class="card-glow" style="background:radial-gradient(circle,rgba(16,185,129,0.12),transparent)"></div>
+        <div class="stat-value stat-green" id="tasksStat">—</div>
+        <div class="stat-label">Tasks Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="card-glow" style="background:radial-gradient(circle,rgba(59,130,246,0.12),transparent)"></div>
+        <div class="stat-value stat-blue" id="focusStat">—</div>
+        <div class="stat-label">Focus Minutes</div>
+      </div>
+      <div class="stat-card">
+        <div class="card-glow" style="background:radial-gradient(circle,rgba(139,92,246,0.12),transparent)"></div>
+        <div class="stat-value stat-purple" id="totalStat">—</div>
+        <div class="stat-label">Total Tasks Done</div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 300px;gap:16px;align-items:start">
+
+      <!-- Today's Tasks -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="card-title" style="margin:0">Today's Tasks</div>
+          <a href="tasks.html" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <div id="todayTasksList">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-title">Loading tasks...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Habits -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="card-title" style="margin:0">Habits</div>
+          <a href="habits.html" class="btn btn-secondary btn-sm">Manage</a>
+        </div>
+        <div id="habitsList">
+          <div class="empty-state">
+            <div class="empty-state-icon">🔥</div>
+            <div class="empty-state-title">Loading habits...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <!-- Wake Status -->
+        <div class="card" id="wakeCard">
+          <div class="card-title">Wake Status</div>
+          <div id="wakeStatus" style="text-align:center;padding:12px 0">
+            <div style="font-size:32px;margin-bottom:8px">⏰</div>
+            <div style="font-size:14px;color:var(--text-muted)">Loading...</div>
+          </div>
+          <a href="alarm.html" class="btn btn-secondary btn-full btn-sm" style="margin-top:8px">Set Alarm</a>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="card">
+          <div class="card-title">Leaderboard</div>
+          <div id="leaderboard">
+            <div class="empty-state">
+              <div class="empty-state-title">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Achievements -->
+        <div class="card">
+          <div class="card-title">Recent Badges</div>
+          <div id="achievementsList">
+            <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">
+              No badges yet — keep going! 🏅
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card section" style="margin-top:16px">
+      <div class="card-title">Quick Actions</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <a href="tasks.html" class="btn btn-secondary">📋 Add Task</a>
+        <a href="focus.html" class="btn btn-secondary">⏱ Start Focus</a>
+        <a href="alarm.html" class="btn btn-secondary">🌙 Set Alarm</a>
+        <a href="habits.html" class="btn btn-secondary">🔥 Log Habit</a>
+        <a href="community.html" class="btn btn-secondary">💬 Community</a>
+        <a href="achievements.html" class="btn btn-secondary">🏅 Achievements</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error('Not authenticated');
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  // Date display
+  const now = new Date();
+  const hour = now.getHours();
+  const greetings = ['Good night', 'Good morning', 'Good afternoon', 'Good evening'];
+  const greetIdx = hour < 5 ? 0 : hour < 12 ? 1 : hour < 17 ? 2 : 3;
+  const user = Auth.getUser();
+  document.getElementById('greetingText').textContent = `${greetings[greetIdx]}, ${user?.username || 'there'} ⚡`;
+  document.getElementById('dateDisplay').textContent = now.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  async function loadDashboard() {
+    try {
+      const data = await api('GET', '/dashboard');
+
+      // Stats
+      document.getElementById('streakStat').textContent = data.user.streak_count || 0;
+      document.getElementById('tasksStat').textContent = `${data.today.tasks_completed}/${data.today.tasks_total}`;
+      document.getElementById('focusStat').textContent = data.today.focus_minutes || 0;
+      document.getElementById('totalStat').textContent = data.user.total_tasks_completed || 0;
+
+      // Score ring
+      const score = calcProductivityScore(data.today);
+      document.getElementById('productivityRing').innerHTML = renderScoreRing(score, 100);
+
+      // Today's tasks
+      const tasksList = document.getElementById('todayTasksList');
+      if (data.today.tasks.length === 0) {
+        tasksList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">✅</div>
+            <div class="empty-state-title">No tasks today</div>
+            <div class="empty-state-desc"><a href="tasks.html" style="color:var(--accent)">Add some tasks</a></div>
+          </div>`;
+      } else {
+        tasksList.innerHTML = data.today.tasks.map(task => `
+          <div class="task-item">
+            <div class="task-checkbox ${task.status === 'completed' ? 'checked' : ''}" onclick="toggleTask('${task.id}', '${task.status}', this)">
+              ${task.status === 'completed' ? '✓' : ''}
+            </div>
+            <div class="task-text ${task.status === 'completed' ? 'completed' : ''}">${task.title}</div>
+            <span class="tag ${task.status === 'completed' ? 'tag-green' : 'tag-amber'}">
+              ${task.status === 'completed' ? 'Done' : 'Pending'}
+            </span>
+          </div>
+        `).join('');
+      }
+
+      // Habits
+      const habitsList = document.getElementById('habitsList');
+      if (data.habits.length === 0) {
+        habitsList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🔥</div>
+            <div class="empty-state-title">No habits yet</div>
+            <div class="empty-state-desc"><a href="habits.html" style="color:var(--accent)">Add habits</a></div>
+          </div>`;
+      } else {
+        habitsList.innerHTML = data.habits.map(h => `
+          <div class="habit-item">
+            <div>
+              <div class="habit-name">${h.name}</div>
+              <div class="habit-streak">🔥 ${h.streak} day streak</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${h.done_today
+                ? `<span class="tag tag-green">Done ✓</span>`
+                : `<button class="btn btn-green btn-sm" onclick="quickCompleteHabit('${h.id}', this)">Mark Done</button>`
+              }
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Wake Status
+      const wakeEl = document.getElementById('wakeStatus');
+      if (data.today.wake) {
+        const wt = data.today.wake;
+        const statusClass = wt.status === 'on_time' ? 'awake' : wt.status === 'late' ? 'pending' : 'missed';
+        const statusText = wt.status === 'on_time' ? 'On Time ✓' : wt.status === 'late' ? 'A bit late' : 'Missed';
+        wakeEl.innerHTML = `
+          <div style="font-size:32px;margin-bottom:8px">
+            ${wt.status === 'on_time' ? '☀️' : wt.status === 'late' ? '😴' : '❌'}
+          </div>
+          <div style="margin-bottom:8px;font-size:20px;font-family:'Syne',sans-serif;font-weight:700">
+            ${dateUtils.formatTime(wt.wake_time)}
+          </div>
+          <span class="wake-status ${statusClass}">${statusText}</span>
+        `;
+      } else {
+        wakeEl.innerHTML = `
+          <div style="font-size:32px;margin-bottom:8px">⏰</div>
+          <div style="font-size:14px;color:var(--text-muted);margin-bottom:8px">Not confirmed yet</div>
+          <a href="alarm.html" class="btn btn-primary btn-sm">Confirm Wake</a>
+        `;
+      }
+
+      // Leaderboard
+      const lb = document.getElementById('leaderboard');
+      if (data.leaderboard.length === 0) {
+        lb.innerHTML = `<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No users yet</div>`;
+      } else {
+        lb.innerHTML = data.leaderboard.map((u, i) => {
+          const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+          return `
+            <div class="leaderboard-item">
+              <span class="lb-rank ${rankClass}">${medal}</span>
+              <span class="lb-name">${u.username}</span>
+              <span class="lb-score">${Math.round(u.productivity_score || 0)}pts</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Achievements
+      if (data.achievements.length > 0) {
+        document.getElementById('achievementsList').innerHTML = data.achievements.map(a => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:20px">${a.icon}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600">${a.title}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${dateUtils.format(a.date_earned)}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+    } catch (err) {
+      Toast.error('Failed to load dashboard: ' + err.message);
+    }
+  }
+
+  async function toggleTask(id, currentStatus, el) {
+    if (currentStatus === 'completed') return;
+    try {
+      await api('PATCH', `/tasks/${id}`, { status: 'completed', progress: 100 });
+      el.classList.add('checked');
+      el.innerHTML = '✓';
+      el.nextElementSibling.classList.add('completed');
+      el.nextElementSibling.nextElementSibling.className = 'tag tag-green';
+      el.nextElementSibling.nextElementSibling.textContent = 'Done';
+      Toast.success('Task completed! 🎯');
+    } catch (err) {
+      Toast.error('Failed to complete task');
+    }
+  }
+
+  async function quickCompleteHabit(id, btn) {
+    try {
+      const data = await api('POST', `/habits/${id}/complete`);
+      btn.closest('.habit-item').querySelector('div:last-child').innerHTML = `<span class="tag tag-green">Done ✓</span>`;
+      Toast.success(`Habit done! 🔥 Streak: ${data.streak} days`);
+    } catch (err) {
+      Toast.error('Failed to log habit');
+    }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

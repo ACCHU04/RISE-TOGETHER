@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Achievements</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .achievement-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .achievement-card.earned {
+      border-color: rgba(245,158,11,0.3);
+      background: linear-gradient(135deg, rgba(245,158,11,0.05), var(--surface));
+    }
+    .achievement-card.earned::before {
+      content: '✓';
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      font-size: 14px;
+      color: var(--accent3);
+      font-weight: 700;
+    }
+    .achievement-card.locked { opacity: 0.55; }
+    .achievement-icon {
+      font-size: 36px;
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .achievement-icon.earned-icon { background: rgba(245,158,11,0.1); }
+    .achievement-icon.locked-icon { background: var(--surface2); filter: grayscale(1); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <h1 class="page-title">Achievements 🏅</h1>
+      <p class="page-subtitle">Unlock badges by building your discipline</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid-4 section">
+      <div class="stat-card">
+        <div class="stat-value stat-accent" id="earnedCount">0</div>
+        <div class="stat-label">Badges Earned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-blue" id="totalCount">0</div>
+        <div class="stat-label">Total Badges</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-green" id="completionPct">0%</div>
+        <div class="stat-label">Completion</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value stat-purple" id="nextBadge">—</div>
+        <div class="stat-label">Next Badge</div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="card section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:600">Overall Progress</span>
+        <span style="font-size:13px;color:var(--text-muted)" id="progressLabel">0 / 0 badges</span>
+      </div>
+      <div class="progress-bar" style="height:12px">
+        <div class="progress-fill" id="overallBar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Badges Grid -->
+    <div id="achievementsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+      <div class="achievement-card">
+        <div style="flex:1;text-align:center;padding:20px;color:var(--text-muted)">Loading achievements...</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  async function loadAchievements() {
+    try {
+      const achievements = await api('GET', '/achievements');
+      const earned = achievements.filter(a => a.earned);
+      const locked = achievements.filter(a => !a.earned);
+
+      document.getElementById('earnedCount').textContent = earned.length;
+      document.getElementById('totalCount').textContent = achievements.length;
+      const pct = Math.round((earned.length / achievements.length) * 100) || 0;
+      document.getElementById('completionPct').textContent = pct + '%';
+      document.getElementById('progressLabel').textContent = `${earned.length} / ${achievements.length} badges`;
+      document.getElementById('overallBar').style.width = pct + '%';
+      if (locked.length > 0) {
+        document.getElementById('nextBadge').textContent = locked[0].icon || '🏅';
+      }
+
+      const grid = document.getElementById('achievementsGrid');
+      grid.innerHTML = '';
+
+      // Earned first
+      [...earned, ...locked].forEach(a => {
+        const card = document.createElement('div');
+        card.className = `achievement-card ${a.earned ? 'earned' : 'locked'}`;
+        card.innerHTML = `
+          <div class="achievement-icon ${a.earned ? 'earned-icon' : 'locked-icon'}">${a.icon || '🏅'}</div>
+          <div style="flex:1">
+            <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">${a.title}</div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px">${a.description}</div>
+            ${a.earned
+              ? `<span class="tag tag-green">Earned ✓</span>`
+              : `<span class="tag tag-amber">Locked 🔒</span>`
+            }
+            ${a.requirement_value ? `
+              <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+                Requirement: ${getRequirementText(a)}
+              </div>
+            ` : ''}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+    } catch (err) {
+      Toast.error('Failed to load achievements');
+    }
+  }
+
+  function getRequirementText(a) {
+    const map = {
+      wake_streak: `Wake on time ${a.requirement_value} days in a row`,
+      tasks_completed: `Complete ${a.requirement_value} tasks total`,
+      habit_streak: `Maintain a habit for ${a.requirement_value} days`,
+      focus_sessions: `Complete ${a.requirement_value} focus sessions`,
+      early_wake: `Wake before 5 AM`,
+    };
+    return map[a.requirement_type] || `Reach ${a.requirement_value}`;
+  }
+
+  loadAchievements();
+</script>
+</body>
+</html>

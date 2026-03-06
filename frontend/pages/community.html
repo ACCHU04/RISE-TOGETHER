@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Community</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebarMount"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <h1 class="page-title">Community 💬</h1>
+          <p class="page-subtitle">Accountability and motivation with your circle</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="online-dot"></span>
+          <span style="font-size:13px;color:var(--text-muted)" id="onlineCount">0 online</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
+
+      <!-- Chat -->
+      <div>
+        <!-- Room selector -->
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn btn-primary btn-sm" onclick="switchRoom('general')" id="roomGeneral"># general</button>
+          <button class="btn btn-secondary btn-sm" onclick="switchRoom('study')" id="roomStudy"># study</button>
+          <button class="btn btn-secondary btn-sm" onclick="switchRoom('wake')" id="roomWake"># wake-up</button>
+          <button class="btn btn-secondary btn-sm" onclick="switchRoom('wins')" id="roomWins"># wins</button>
+        </div>
+
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <!-- Messages appear here -->
+            <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px">
+              Connecting to community...
+            </div>
+          </div>
+          <div id="typingIndicator" style="display:none;padding:6px 16px;font-size:12px;color:var(--text-muted);background:var(--surface);border-left:1px solid var(--border);border-right:1px solid var(--border)">
+            Someone is typing...
+          </div>
+          <div class="chat-input-area">
+            <input class="chat-input" id="chatInput" placeholder="Type a message..." maxlength="500"
+              onkeydown="handleKeyDown(event)" oninput="handleTyping()">
+            <button class="btn btn-primary" onclick="sendMessage()">Send →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <!-- Online Members -->
+        <div class="card">
+          <div class="card-title">Online Now</div>
+          <div id="onlineList">
+            <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">Connecting...</div>
+          </div>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="card">
+          <div class="card-title">Live Activity</div>
+          <div id="activityFeed" style="display:flex;flex-direction:column;gap:0">
+            <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">
+              Activity will appear here
+            </div>
+          </div>
+        </div>
+
+        <!-- Community Tips -->
+        <div class="card">
+          <div class="card-title">Community Rules 📜</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:13px;color:var(--text-dim)">✅ Be supportive and encouraging</div>
+            <div style="font-size:13px;color:var(--text-dim)">✅ Share your wins and challenges</div>
+            <div style="font-size:13px;color:var(--text-dim)">✅ Hold each other accountable</div>
+            <div style="font-size:13px;color:var(--text-dim)">❌ No negativity or spam</div>
+            <div style="font-size:13px;color:var(--text-dim)">❌ No off-topic content</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  if (!Auth.requireAuth()) throw new Error();
+
+  document.getElementById('sidebarMount').innerHTML = getSidebarHTML();
+  initSidebar();
+
+  const currentUser = Auth.getUser();
+  let socket = null;
+  let currentRoom = 'general';
+  let typingTimeout = null;
+  let isTyping = false;
+
+  // ─── Socket Connection ───────────────────────────────────────────────────────
+
+  function connectSocket() {
+    const token = Auth.getToken();
+    try {
+      socket = io('http://localhost:3000', {
+        auth: { token },
+        reconnectionAttempts: 5,
+        timeout: 5000,
+      });
+      window._socket = socket;
+
+      socket.on('connect', () => {
+        socket.emit('join_room', currentRoom);
+        loadHistory();
+        document.getElementById('chatMessages').innerHTML = '';
+      });
+
+      socket.on('connect_error', (err) => {
+        showOfflineMessage();
+      });
+
+      socket.on('new_message', (msg) => {
+        appendMessage(msg);
+      });
+
+      socket.on('online_users', (users) => {
+        document.getElementById('onlineCount').textContent = `${users.length} online`;
+        renderOnlineList(users);
+      });
+
+      socket.on('user_joined', (data) => {
+        appendSystemMessage(`${data.username} joined #${data.room}`);
+      });
+
+      socket.on('user_woke_up', (data) => {
+        addActivityItem('wake', `${data.username} woke up at ${data.time}! 🌅`);
+      });
+
+      socket.on('activity_update', (data) => {
+        const icons = { task: '✅', focus: '⏱', habit: '🔥' };
+        addActivityItem(data.type, `${data.username} ${data.text}`);
+      });
+
+      socket.on('user_typing', (data) => {
+        if (data.username !== currentUser?.username) {
+          document.getElementById('typingIndicator').style.display = 'block';
+          document.getElementById('typingIndicator').textContent = `${data.username} is typing...`;
+          clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => {
+            document.getElementById('typingIndicator').style.display = 'none';
+          }, 2000);
+        }
+      });
+
+      socket.on('user_stop_typing', () => {
+        document.getElementById('typingIndicator').style.display = 'none';
+      });
+
+    } catch (e) {
+      showOfflineMessage();
+    }
+  }
+
+  function showOfflineMessage() {
+    document.getElementById('chatMessages').innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--text-muted)">
+        <div style="font-size:32px;margin-bottom:12px">🔌</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text-dim);margin-bottom:6px">Real-time server offline</div>
+        <div style="font-size:13px">Start the Node.js server to enable live chat</div>
+        <div style="font-size:12px;margin-top:8px;font-family:monospace;background:var(--surface2);padding:8px 12px;border-radius:8px;display:inline-block">cd node-server && npm start</div>
+      </div>`;
+    loadHistory(); // Still show historical messages
+  }
+
+  async function loadHistory() {
+    try {
+      const messages = await api('GET', `/messages?room=${currentRoom}&limit=50`);
+      const container = document.getElementById('chatMessages');
+      if (messages.length === 0) {
+        container.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px">No messages yet. Say hello! 👋</div>`;
+        return;
+      }
+      container.innerHTML = '';
+      messages.forEach(m => appendMessage(m, false));
+      scrollToBottom();
+    } catch (e) {}
+  }
+
+  function appendMessage(msg, scroll = true) {
+    const isOwn = msg.user_id === currentUser?.id || msg.username === currentUser?.username;
+    const container = document.getElementById('chatMessages');
+
+    // Remove empty state
+    const empty = container.querySelector('div[style*="padding:20px"]');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = 'chat-message';
+    if (isOwn) div.style.flexDirection = 'row-reverse';
+
+    const initials = (msg.username || 'U')[0].toUpperCase();
+    const colors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444'];
+    const color = colors[initials.charCodeAt(0) % colors.length];
+    const time = new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    div.innerHTML = `
+      <div class="chat-avatar" style="background:${color}">${initials}</div>
+      <div>
+        <div class="chat-bubble ${isOwn ? 'own' : ''}">
+          ${!isOwn ? `<div class="chat-user">${msg.username}${msg.streak_count > 0 ? ` 🔥${msg.streak_count}` : ''}</div>` : ''}
+          <div class="chat-text">${escapeHtml(msg.message)}</div>
+          <div class="chat-time">${time}</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+    if (scroll) scrollToBottom();
+  }
+
+  function appendSystemMessage(text) {
+    const container = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;font-size:12px;color:var(--text-muted);padding:8px';
+    div.textContent = `— ${text} —`;
+    container.appendChild(div);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    const c = document.getElementById('chatMessages');
+    c.scrollTop = c.scrollHeight;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    if (socket && socket.connected) {
+      socket.emit('send_message', { message: msg, room: currentRoom });
+      if (isTyping) {
+        socket.emit('stop_typing', currentRoom);
+        isTyping = false;
+      }
+    } else {
+      // Fallback: show locally
+      appendMessage({
+        user_id: currentUser?.id,
+        username: currentUser?.username,
+        message: msg,
+        timestamp: new Date().toISOString(),
+        streak_count: 0,
+      });
+    }
+
+    input.value = '';
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function handleTyping() {
+    if (socket && socket.connected) {
+      if (!isTyping) {
+        isTyping = true;
+        socket.emit('typing', currentRoom);
+      }
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        isTyping = false;
+        socket.emit('stop_typing', currentRoom);
+      }, 1500);
+    }
+  }
+
+  function switchRoom(room) {
+    if (room === currentRoom) return;
+    if (socket && socket.connected) {
+      socket.emit('join_room', room);
+    }
+    currentRoom = room;
+    document.querySelectorAll('[id^="room"]').forEach(b => b.className = 'btn btn-secondary btn-sm');
+    document.getElementById(`room${room.charAt(0).toUpperCase() + room.slice(1)}`).className = 'btn btn-primary btn-sm';
+    document.getElementById('chatMessages').innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px">Loading...</div>';
+    loadHistory();
+  }
+
+  function renderOnlineList(users) {
+    const list = document.getElementById('onlineList');
+    if (users.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:12px">No one online</div>';
+      return;
+    }
+    list.innerHTML = users.map(u => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span class="online-dot"></span>
+        <span style="font-size:13px;font-weight:500">${u.username}</span>
+        ${u.streak > 0 ? `<span style="font-size:11px;color:var(--accent);margin-left:auto">🔥${u.streak}</span>` : ''}
+      </div>
+    `).join('');
+  }
+
+  const activityItems = [];
+  function addActivityItem(type, text) {
+    const icons = { task: '✅', focus: '⏱', habit: '🔥', wake: '☀️' };
+    activityItems.unshift({ type, text, time: new Date() });
+    if (activityItems.length > 10) activityItems.pop();
+
+    document.getElementById('activityFeed').innerHTML = activityItems.map(item => `
+      <div class="activity-item">
+        <div class="activity-icon ${item.type}">${icons[item.type] || '⚡'}</div>
+        <div style="flex:1">
+          <div style="font-size:13px">${item.text}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+            ${item.time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Initialize
+  connectSocket();
+</script>
+</body>
+</html>

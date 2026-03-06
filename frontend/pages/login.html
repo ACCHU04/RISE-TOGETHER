@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise Circle — Login</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    .feature-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin: 3px;
+    }
+    .features-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .divider-text {
+      text-align: center;
+      position: relative;
+      margin: 16px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .divider-text::before, .divider-text::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: calc(50% - 30px);
+      height: 1px;
+      background: var(--border);
+    }
+    .divider-text::before { left: 0; }
+    .divider-text::after { right: 0; }
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: var(--danger);
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card fade-in">
+    <div class="auth-logo">
+      <div class="auth-logo-text">⚡ Rise Circle</div>
+      <div class="auth-logo-sub">Your discipline, your circle</div>
+    </div>
+
+    <div class="features-row">
+      <span class="feature-pill">🔥 Habit Streaks</span>
+      <span class="feature-pill">⏱ Focus Timer</span>
+      <span class="feature-pill">💬 Community</span>
+      <span class="feature-pill">📊 Analytics</span>
+    </div>
+
+    <div class="auth-tab-container">
+      <div class="auth-tab active" onclick="switchTab('login')">Sign In</div>
+      <div class="auth-tab" onclick="switchTab('signup')">Create Account</div>
+    </div>
+
+    <!-- Error message -->
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Login Form -->
+    <div id="loginForm">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="loginEmail" placeholder="your@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="loginPassword" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="handleLogin()" id="loginBtn">
+        Sign In →
+      </button>
+      <div class="divider-text">or try a demo</div>
+      <button class="btn btn-secondary btn-full" onclick="fillDemo()">
+        Use Demo Account
+      </button>
+    </div>
+
+    <!-- Signup Form -->
+    <div id="signupForm" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" class="form-input" id="signupUsername" placeholder="yourname">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-input" id="signupEmail" placeholder="your@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="signupPassword" placeholder="At least 6 characters">
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" onclick="handleSignup()" id="signupBtn">
+        Create Account →
+      </button>
+    </div>
+
+    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:20px">
+      By using Rise Circle, you agree to build better habits 🔥
+    </p>
+  </div>
+</div>
+
+<script src="../js/app.js"></script>
+<script>
+  // Redirect if already logged in
+  if (Auth.isLoggedIn()) window.location.href = 'dashboard.html';
+
+  let currentTab = 'login';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.auth-tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'signup'));
+    });
+    document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('signupForm').style.display = tab === 'signup' ? 'block' : 'none';
+    hideError();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorMsg').style.display = 'none';
+  }
+
+  function fillDemo() {
+    document.getElementById('loginEmail').value = 'demo@risecircle.com';
+    document.getElementById('loginPassword').value = 'demo1234';
+    Toast.info('Demo credentials filled!');
+  }
+
+  async function handleLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) { showError('Please fill in all fields'); return; }
+
+    const btn = document.getElementById('loginBtn');
+    btn.textContent = 'Signing in...';
+    btn.disabled = true;
+    hideError();
+
+    try {
+      const data = await api('POST', '/auth/login', { email, password });
+      Auth.save(data.token, data.user);
+      Toast.success('Welcome back! 🔥');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
+    } catch (err) {
+      showError(err.message || 'Invalid credentials');
+      btn.textContent = 'Sign In →';
+      btn.disabled = false;
+    }
+  }
+
+  async function handleSignup() {
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+
+    if (!username || !email || !password) { showError('Please fill in all fields'); return; }
+    if (password.length < 6) { showError('Password must be at least 6 characters'); return; }
+
+    const btn = document.getElementById('signupBtn');
+    btn.textContent = 'Creating account...';
+    btn.disabled = true;
+    hideError();
+
+    try {
+      const data = await api('POST', '/auth/signup', { username, email, password });
+      Auth.save(data.token, data.user);
+      Toast.success('Account created! Welcome to Rise Circle 🚀');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
+    } catch (err) {
+      showError(err.message || 'Failed to create account');
+      btn.textContent = 'Create Account →';
+      btn.disabled = false;
+    }
+  }
+
+  // Enter key support
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (currentTab === 'login') handleLogin();
+      else handleSignup();
+    }
+  });
+</script>
+</body>
+</html>
