@@ -1,6 +1,37 @@
-# ⚡ Rise Circle
+<div align="center">
+  <svg width="120" height="80" viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="60" cy="48" r="28" fill="none" stroke="#1a1a3e" stroke-width="4"/>
+    <path d="M36 48 Q48 24 60 28" fill="none" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+    <path d="M40 48 Q50 18 60 22" fill="none" stroke="#f7c948" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M44 48 Q52 14 60 18" fill="none" stroke="#fae078" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="60" cy="30" r="6" fill="#f5a623" opacity="0.9"/>
+  </svg>
+
+  # ⚡ Rise Circle
+
+  <p>
+    <img src="https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square&logo=python" alt="Python 3.10+">
+    <img src="https://img.shields.io/badge/node-18%2B-green?style=flat-square&logo=node.js" alt="Node 18+">
+    <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs Welcome">
+  </p>
+</div>
 
 > A full-stack discipline and productivity platform — track habits, focus sessions, wake-up times, and compete with your community.
+
+---
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+| Requirement | Version |
+|---|---|
+| **Python** | 3.10+ |
+| **Node.js** | 18+ |
+| **npm** | 9+ |
+| **PostgreSQL** | 14+ |
+| **Docker** (optional) | Latest — only needed for Option A |
 
 ---
 
@@ -9,7 +40,7 @@
 ### Option A: Docker (Recommended)
 
 ```bash
-git clone <repo>
+git clone https://github.com/ACCHU04/RISE-TOGETHER.git
 cd rise-circle
 docker-compose up --build
 ```
@@ -105,6 +136,17 @@ rise-circle/
 
 ---
 
+## 🔧 Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | — | Secret key for signing JWT tokens |
+| `PYTHON_API` | Yes | `http://localhost:8000` | Backend API base URL (used by node-server) |
+| `PORT` | No | `8000` | FastAPI server port |
+
+---
+
 ## 🔌 API Endpoints
 
 | Method | Path | Description |
@@ -174,6 +216,12 @@ rise-circle/
 
 ---
 
+## 🖼️ Screenshots
+
+> *(Add screenshots of the dashboard, focus timer, habits tracker, and community chat here.)*
+
+---
+
 ## 🎨 Tech Stack
 
 | Layer | Technology |
@@ -221,6 +269,18 @@ rise-circle/
 - Accountability groups
 - Mood tracking
 - Dark/light mode toggle
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
